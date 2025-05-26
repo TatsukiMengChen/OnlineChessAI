@@ -1,0 +1,24 @@
+# Java
+/target/
+*.class
+*.jar
+*.war
+*.iml
+
+# Gradle
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# IDE
+.idea/
+*.iws
+*.ipr
+*.iml
+
+# OS files
+.DS_Store
+Thumbs.db
+
+.env
+

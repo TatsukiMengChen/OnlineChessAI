@@ -1,0 +1,29 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DB_URL")
+}
+
+model User {
+  id         Int      @id @default(autoincrement())
+  email      String   @unique
+  password   String
+  created_at DateTime @default(now())
+
+  @@map("users")
+}
+
+model Room {
+  id         String   @id @default(uuid()) // 房间ID，UUID
+  name       String // 房间名
+  player1_id Int? // 玩家1用户ID，可为空
+  player2_id Int? // 玩家2用户ID，可为空
+  status     String // 房间状态（如：waiting, playing, finished）
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@map("rooms")
+}
