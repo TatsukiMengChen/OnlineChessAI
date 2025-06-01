@@ -6,6 +6,7 @@
   android:padding="24dp"
   android:background="@color/chess_cream">
 
+  <!-- 房间信息 -->
   <TextView
     android:id="@+id/tv_room_name"
     android:layout_width="wrap_content"
@@ -13,6 +14,7 @@
     android:text="房间名称"
     android:textSize="22sp"
     android:textStyle="bold"
+    android:textColor="@color/chess_dark_brown"
     android:layout_marginBottom="8dp" />
 
   <TextView
@@ -21,27 +23,99 @@
     android:layout_height="wrap_content"
     android:text="房间ID: "
     android:textSize="16sp"
-    android:layout_marginBottom="24dp" />
-
-  <!-- 预留成员列表、观战列表等区域，可后续扩展 -->
-  <TextView
-    android:id="@+id/tv_room_members"
-    android:layout_width="wrap_content"
-    android:layout_height="wrap_content"
-    android:text="成员列表（待实现）"
-    android:layout_marginBottom="32dp" />
-
-  <Button
-    android:id="@+id/btn_start_game"
-    android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    android:text="开始游戏（预留）"
+    android:textColor="@color/chess_brown"
     android:layout_marginBottom="16dp" />
 
-  <Button
-    android:id="@+id/btn_quit_room"
+  <!-- 游戏状态 -->
+  <TextView
+    android:id="@+id/tv_game_status"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:text="退出房间" />
+    android:text="连接中..."
+    android:textSize="18sp"
+    android:textStyle="bold"
+    android:textAlignment="center"
+    android:background="@drawable/bg_status_card"
+    android:padding="12dp"
+    android:layout_marginBottom="24dp"
+    android:textColor="@color/chess_dark_brown" />
+
+  <!-- 玩家状态区域 -->
+  <LinearLayout
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="@drawable/bg_player_status_card"
+    android:padding="16dp"
+    android:layout_marginBottom="24dp">
+
+    <TextView
+      android:layout_width="wrap_content"
+      android:layout_height="wrap_content"
+      android:text="玩家状态"
+      android:textSize="18sp"
+      android:textStyle="bold"
+      android:textColor="@color/chess_dark_brown"
+      android:layout_marginBottom="12dp" />
+
+    <TextView
+      android:id="@+id/tv_player1_status"
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:text="玩家1: 等待加入"
+      android:textSize="16sp"
+      android:padding="8dp"
+      android:background="@drawable/bg_player_item"
+      android:layout_marginBottom="8dp"
+      android:textColor="@color/chess_dark_brown"
+      android:drawableStart="@drawable/ic_player_red"
+      android:drawablePadding="8dp"
+      android:gravity="center_vertical" />
+
+    <TextView
+      android:id="@+id/tv_player2_status"
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:text="玩家2: 等待加入"
+      android:textSize="16sp"
+      android:padding="8dp"
+      android:background="@drawable/bg_player_item"
+      android:textColor="@color/chess_dark_brown"
+      android:drawableStart="@drawable/ic_player_black"
+      android:drawablePadding="8dp"
+      android:gravity="center_vertical" />
+
+  </LinearLayout>
+
+  <!-- 操作按钮区域 -->
+  <LinearLayout
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:layout_weight="1"
+    android:gravity="bottom">
+
+    <Button
+      android:id="@+id/btn_start_game"
+      android:layout_width="match_parent"
+      android:layout_height="56dp"
+      android:text="准备"
+      android:textSize="18sp"
+      android:textStyle="bold"
+      android:background="@drawable/bg_button_primary"
+      android:textColor="@android:color/white"
+      android:layout_marginBottom="12dp"
+      android:enabled="false" />
+
+    <Button
+      android:id="@+id/btn_quit_room"
+      android:layout_width="match_parent"
+      android:layout_height="48dp"
+      android:text="退出房间"
+      android:textSize="16sp"
+      android:background="@drawable/bg_button_secondary"
+      android:textColor="@color/chess_dark_brown" />
+
+  </LinearLayout>
 
 </LinearLayout>

@@ -4,10 +4,14 @@
     <color name="chess_brown_dark">#654321</color>
     <color name="chess_brown_medium">#795548</color>
     <color name="chess_brown_light">#A0522D</color>
+    <color name="chess_brown">#8B4513</color>
+    <color name="chess_dark_brown">#654321</color>
     <color name="chess_gold">#FFD700</color>
     <color name="chess_gold_dark">#DAA520</color>
-    <color name="chess_cream">#FFF8DC</color>
+    <color name="chess_cream">#F5F5DC</color>
     <color name="chess_beige">#F5DEB3</color>
+    <color name="chess_light_brown">#D2B48C</color>
+    <color name="chess_gray">#A0A0A0</color>
 
     <!-- UI Colors -->
     <color name="surface_light">#FAFAFA</color>
