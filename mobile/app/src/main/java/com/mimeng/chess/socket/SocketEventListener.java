@@ -73,6 +73,16 @@ public interface SocketEventListener {
   void onRoomNotFound(String message);
 
   /**
+   * 玩家颜色分配
+   */
+  void onPlayerColorAssigned(JsonObject data);
+
+  /**
+   * 游戏结束
+   */
+  void onGameEnded(JsonObject data);
+
+  /**
    * 连接错误
    */
   void onError(String error);

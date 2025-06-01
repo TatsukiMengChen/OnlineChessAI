@@ -270,7 +270,9 @@ public class SocketManager {
     socket.on("room_status", onRoomStatus);
     socket.on("game_state", onGameState);
     socket.on("game_started", onGameStarted);
+    socket.on("game_ended", onGameEnded); // 添加游戏结束事件监听
     socket.on("player_surrendered", onPlayerSurrendered);
+    socket.on("player_color_assigned", onPlayerColorAssigned);
   }
 
   // 事件监听器实现
@@ -504,6 +506,37 @@ public class SocketManager {
       }
     } catch (Exception e) {
       Log.e(TAG, "解析 player_surrendered 数据失败: " + e.getMessage());
+    }
+  };
+
+  private Emitter.Listener onPlayerColorAssigned = args -> {
+    Log.d(TAG, "接收事件: player_color_assigned, 数据: " + (args.length > 0 ? args[0].toString() : "无数据"));
+    try {
+      JsonObject data = JsonParser.parseString(args[0].toString()).getAsJsonObject();
+      if (currentListener != null) {
+        currentListener.onPlayerColorAssigned(data);
+      }
+    } catch (Exception e) {
+      Log.e(TAG, "解析 player_color_assigned 数据失败: " + e.getMessage());
+    }
+  };
+
+  private Emitter.Listener onGameEnded = args -> {
+    Log.d(TAG, "接收事件: game_ended, 数据: " + (args.length > 0 ? args[0].toString() : "无数据"));
+    try {
+      JsonObject data = JsonParser.parseString(args[0].toString()).getAsJsonObject();
+      if (currentListener != null) {
+        currentListener.onGameEnded(data);
+      }
+    } catch (Exception e) {
+      Log.e(TAG, "解析 game_ended 数据失败: " + e.getMessage());
+      // 即使解析失败也要通知游戏结束
+      if (currentListener != null) {
+        JsonObject fallbackData = new JsonObject();
+        fallbackData.addProperty("result", "游戏结束");
+        fallbackData.addProperty("reason", "数据解析失败");
+        currentListener.onGameEnded(fallbackData);
+      }
     }
   };
 }

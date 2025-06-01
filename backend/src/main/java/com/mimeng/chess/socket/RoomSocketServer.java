@@ -462,11 +462,12 @@ public class RoomSocketServer implements InitializingBean {
           String dataStr = (String) data;
           if (dataStr.trim().startsWith("{") && dataStr.trim().endsWith("}")) {
             try {
-              // 简单的JSON解析移动数据
-              // 这是一个复杂的嵌套JSON，建议前端直接发送Map格式
-              logger.warn("Received JSON string format for move_piece, please use Map format from frontend");
-              client.sendEvent("move_failed", "请使用正确的数据格式");
-              return;
+              // 新增：将JSON字符串反序列化为Map
+              com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+              @SuppressWarnings("unchecked")
+              Map<String, Object> map = mapper.readValue(dataStr, Map.class);
+              from = (Map<String, Object>) map.get("from");
+              to = (Map<String, Object>) map.get("to");
             } catch (Exception e) {
               logger.warn("Failed to parse move_piece JSON: {}", e.getMessage());
               client.sendEvent("move_failed", "JSON解析失败");
@@ -500,7 +501,9 @@ public class RoomSocketServer implements InitializingBean {
               "to", Map.of("row", toPos.getRow(), "col", toPos.getCol())));
 
           // 发送更新的游戏状态
-          sendGameState(userInfo.roomId); // 检查游戏是否结束
+          sendGameState(userInfo.roomId);
+
+          // 检查游戏是否结束（将帅被吃）
           ChessGameState gameState = gameManager.getGameState(userInfo.roomId);
           if (gameState != null && gameState.getStatus() != GameStatus.PLAYING) {
             logger.info("Game ended in room {} with status {}", userInfo.roomId, gameState.getStatus());
@@ -618,7 +621,8 @@ public class RoomSocketServer implements InitializingBean {
                 roomClients.remove(userInfo.roomId);
                 logger.info("Room {} now empty, removing from active rooms", userInfo.roomId);
               }
-            } // 只有已认证的用户才需要离开游戏房间
+            }
+            // 只有已认证的用户才需要离开游戏房间
             if (userInfo.isAuthenticated) {
               gameManager.leaveRoom(userInfo.roomId, userInfo.userId);
 
@@ -631,6 +635,38 @@ public class RoomSocketServer implements InitializingBean {
               // 发送更新的游戏状态和房间状态给剩余玩家
               sendGameState(userInfo.roomId);
               sendRoomStatus(userInfo.roomId);
+
+              // 新增：如果正在游戏且有人退出，立即通知并删除房间
+              ChessGameState gameState = gameManager.getGameState(userInfo.roomId);
+              if (gameState != null && gameState.getStatus() == GameStatus.PLAYING) {
+                logger.info("Room {} is in PLAYING status and a player left, closing room immediately",
+                    userInfo.roomId);
+                broadcastToRoom(userInfo.roomId, "room_closed", Map.of(
+                    "message", "有玩家中途退出，房间已关闭"));
+                // 断开剩余所有客户端
+                Map<String, SocketIOClient> clients = roomClients.get(userInfo.roomId);
+                if (clients != null) {
+                  for (SocketIOClient c : clients.values()) {
+                    try {
+                      c.sendEvent("forced_disconnect", "房间已关闭，连接即将断开");
+                      java.util.concurrent.Executors.newSingleThreadScheduledExecutor()
+                          .schedule(() -> c.disconnect(), 2, java.util.concurrent.TimeUnit.SECONDS);
+                    } catch (Exception e) {
+                      logger.error("Error disconnecting client: {}", e.getMessage());
+                    }
+                  }
+                  // 清理客户端信息
+                  for (String cid : clients.keySet()) {
+                    clientUsers.remove(cid);
+                    authenticatedClients.remove(cid);
+                  }
+                }
+                // 清理房间信息
+                roomClients.remove(userInfo.roomId);
+                // 从游戏管理器中删除房间
+                gameManager.removeRoom(userInfo.roomId);
+                logger.info("Room {} has been completely cleaned up due to player exit during game", userInfo.roomId);
+              }
             }
           } else {
             logger.debug("Unknown client {} disconnected", clientId);
@@ -895,4 +931,5 @@ public class RoomSocketServer implements InitializingBean {
       }
     }, 10, java.util.concurrent.TimeUnit.SECONDS);
   }
+
 }

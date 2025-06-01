@@ -7,6 +7,7 @@ import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.Rect;
 import android.graphics.RectF;
+import android.os.Looper;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.view.MotionEvent;
@@ -103,11 +104,9 @@ public class ChessBoardView extends View {
     selectedPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     selectedPaint.setColor(Color.parseColor("#4CAF50"));
     selectedPaint.setStyle(Paint.Style.STROKE);
-    selectedPaint.setStrokeWidth(4f);
-
-    // 可移动位置画笔
+    selectedPaint.setStrokeWidth(4f); // 可移动位置画笔
     availableMovePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-    availableMovePaint.setColor(Color.parseColor("#FF9800"));
+    availableMovePaint.setColor(Color.parseColor("#4CAF50")); // 绿色
     availableMovePaint.setStyle(Paint.Style.FILL);
 
     // 背景画笔
@@ -154,7 +153,10 @@ public class ChessBoardView extends View {
   protected void onDraw(Canvas canvas) {
     super.onDraw(canvas);
 
+    Log.d(TAG, "onDraw called - cellWidth: " + cellWidth + ", cellHeight: " + cellHeight);
+
     if (cellWidth <= 0 || cellHeight <= 0) {
+      Log.d(TAG, "onDraw skipped due to invalid cell dimensions");
       return;
     }
 
@@ -175,6 +177,8 @@ public class ChessBoardView extends View {
 
     // 绘制选中状态
     drawSelectedPosition(canvas);
+
+    Log.d(TAG, "onDraw completed");
   }
 
   /**
@@ -251,8 +255,16 @@ public class ChessBoardView extends View {
       float x = boardLeft + position.getCol() * cellWidth;
       float y = boardTop + position.getRow() * cellHeight;
 
-      // 绘制小圆点表示可移动位置
-      canvas.drawCircle(x, y, pieceRadius * 0.3f, availableMovePaint);
+      // 绘制绿色圆点表示可移动位置
+      float dotRadius = pieceRadius * 0.4f;
+      canvas.drawCircle(x, y, dotRadius, availableMovePaint);
+
+      // 添加白色边框使绿点更明显
+      Paint borderPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+      borderPaint.setColor(Color.WHITE);
+      borderPaint.setStyle(Paint.Style.STROKE);
+      borderPaint.setStrokeWidth(2f);
+      canvas.drawCircle(x, y, dotRadius, borderPaint);
     }
   }
 
@@ -261,19 +273,24 @@ public class ChessBoardView extends View {
    */
   private void drawPieces(Canvas canvas) {
     if (gameState == null || gameState.getBoard() == null) {
+      Log.d(TAG, "Cannot draw pieces: gameState or board is null");
       return;
     }
 
     ChessBoard board = gameState.getBoard();
+    int piecesDrawn = 0;
 
     for (int row = 0; row < ROWS; row++) {
       for (int col = 0; col < COLS; col++) {
         ChessPiece piece = board.getPieceAt(new Position(row, col));
         if (piece != null) {
           drawPiece(canvas, piece, row, col);
+          piecesDrawn++;
         }
       }
     }
+
+    Log.d(TAG, "Drew " + piecesDrawn + " pieces on the board");
   }
 
   /**
@@ -428,10 +445,22 @@ public class ChessBoardView extends View {
   }
 
   // ===== Getters and Setters =====
-
   public void setGameState(ChessGameState gameState) {
+    Log.d(TAG, "Setting new game state, forcing redraw");
     this.gameState = gameState;
-    invalidate(); // 重新绘制
+
+    // 强制立即重绘
+    invalidate();
+
+    // 如果在主线程中，立即请求重绘
+    if (Looper.getMainLooper() == Looper.myLooper()) {
+      post(new Runnable() {
+        @Override
+        public void run() {
+          invalidate();
+        }
+      });
+    }
   }
 
   public void setPlayerColor(PlayerColor playerColor) {

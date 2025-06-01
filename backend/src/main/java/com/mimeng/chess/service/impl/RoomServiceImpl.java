@@ -42,9 +42,6 @@ public class RoomServiceImpl extends ServiceImpl<RoomMapper, Room> implements Ro
     if (room == null) {
       return ServiceResult.error("房间不存在");
     }
-    if (!"waiting".equals(room.getStatus())) {
-      return ServiceResult.error("房间状态不是waiting，无法关闭");
-    }
     if (!userId.equals(room.getPlayer1Id())) {
       return ServiceResult.error("只有房主才能关闭房间");
     }

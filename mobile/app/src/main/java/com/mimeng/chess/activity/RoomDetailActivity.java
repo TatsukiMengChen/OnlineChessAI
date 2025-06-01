@@ -56,6 +56,9 @@ public class RoomDetailActivity extends BaseActivity implements SocketEventListe
   private long lastReadyToggleTime = 0;
   private static final long READY_DEBOUNCE_DELAY = 2000; // 2秒防抖，避免快速点击
 
+  // 添加请求码常量
+  private static final int REQUEST_CODE_GAME = 1001;
+
   public static void start(Context context, String roomId, String roomName) {
     Intent intent = new Intent(context, RoomDetailActivity.class);
     intent.putExtra(EXTRA_ROOM_ID, roomId);
@@ -199,18 +202,28 @@ public class RoomDetailActivity extends BaseActivity implements SocketEventListe
   @Override
   public void onGameStarted(JsonObject gameState) {
     runOnUiThread(() -> {
-      isGameStarted = true;
-      tvGameStatus.setText("游戏开始！");
-
-      // 隐藏准备和退出按钮，显示投降按钮
-      btnStartGame.setVisibility(View.GONE);
-      btnQuitRoom.setVisibility(View.GONE);
-      btnSurrender.setVisibility(View.VISIBLE);
       Toast.makeText(this, "游戏开始！", Toast.LENGTH_SHORT).show();
 
-      // 跳转到游戏界面
-      GameActivity.start(this, roomId, gameState);
+      // 使用startActivityForResult启动游戏界面，以便接收游戏结束的结果
+      Intent gameIntent = new Intent(this, GameActivity.class);
+      gameIntent.putExtra("room_id", roomId);
+      gameIntent.putExtra("game_state", gameState.toString());
+      startActivityForResult(gameIntent, REQUEST_CODE_GAME);
+
+      // 游戏开始后直接关闭房间详情页面
+      finish();
     });
+  }
+
+  @Override
+  protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+    super.onActivityResult(requestCode, resultCode, data);
+
+    if (requestCode == REQUEST_CODE_GAME && resultCode == GameActivity.RESULT_GAME_ENDED) {
+      // 游戏结束，设置结果通知调用者刷新列表
+      setResult(RESULT_OK);
+      finish();
+    }
   }
 
   @Override
@@ -276,6 +289,44 @@ public class RoomDetailActivity extends BaseActivity implements SocketEventListe
     });
   }
 
+  @Override
+  public void onPlayerColorAssigned(JsonObject data) {
+    // TODO: 这里可以根据需要处理分配颜色后的逻辑，比如弹窗提示或UI更新
+    // 示例：Toast.makeText(this, "你被分配为" + data.get("color").getAsString(),
+    // Toast.LENGTH_SHORT).show();
+  }
+
+  @Override
+  public void onGameEnded(JsonObject data) {
+    runOnUiThread(() -> {
+      try {
+        String result = data.has("result") ? data.get("result").getAsString() : "游戏结束";
+        String reason = data.has("reason") ? data.get("reason").getAsString() : "";
+
+        String message = result;
+        if (!reason.isEmpty()) {
+          message += " (" + reason + ")";
+        }
+
+        Toast.makeText(this, message, Toast.LENGTH_LONG).show();
+
+        // 重置游戏状态，重新显示房间界面
+        isGameStarted = false;
+        btnStartGame.setVisibility(View.VISIBLE);
+        btnQuitRoom.setVisibility(View.VISIBLE);
+        btnSurrender.setVisibility(View.GONE);
+        btnStartGame.setText("准备");
+        tvGameStatus.setText("游戏已结束");
+      } catch (Exception e) {
+        Toast.makeText(this, "游戏结束", Toast.LENGTH_LONG).show();
+        isGameStarted = false;
+        btnStartGame.setVisibility(View.VISIBLE);
+        btnQuitRoom.setVisibility(View.VISIBLE);
+        btnSurrender.setVisibility(View.GONE);
+      }
+    });
+  }
+
   private void updateRoomStatus(JsonObject data) {
     try {
       String status = data.get("status").getAsString();
@@ -285,22 +336,17 @@ public class RoomDetailActivity extends BaseActivity implements SocketEventListe
       switch (status) {
         case "WAITING":
           tvGameStatus.setText("等待玩家准备");
-          // 如果不是游戏中，确保显示正确的按钮
-          if (!isGameStarted) {
-            btnStartGame.setVisibility(View.VISIBLE);
-            btnQuitRoom.setVisibility(View.VISIBLE);
-            btnSurrender.setVisibility(View.GONE);
-          }
+          // 确保显示正确的按钮
+          btnStartGame.setVisibility(View.VISIBLE);
+          btnQuitRoom.setVisibility(View.VISIBLE);
+          btnSurrender.setVisibility(View.GONE);
           break;
         case "PLAYING":
           tvGameStatus.setText("游戏进行中");
-          if (!isGameStarted) {
-            // 如果还没有收到 game_started 事件，先设置游戏状态
-            isGameStarted = true;
-            btnStartGame.setVisibility(View.GONE);
-            btnQuitRoom.setVisibility(View.GONE);
-            btnSurrender.setVisibility(View.VISIBLE);
-          }
+          // 游戏开始，隐藏所有按钮，等待跳转
+          btnStartGame.setVisibility(View.GONE);
+          btnQuitRoom.setVisibility(View.GONE);
+          btnSurrender.setVisibility(View.GONE);
           break;
         default:
           tvGameStatus.setText(message.isEmpty() ? "房间状态: " + status : message);
@@ -404,34 +450,10 @@ public class RoomDetailActivity extends BaseActivity implements SocketEventListe
   }
 
   /**
-   * 投降操作
+   * 投降操作 - 已移动到GameActivity
    */
   private void onSurrenderClicked() {
-    if (!socketManager.isConnected()) {
-      Toast.makeText(this, "连接断开，无法投降", Toast.LENGTH_SHORT).show();
-      return;
-    }
-
-    new AlertDialog.Builder(this)
-        .setTitle("投降确认")
-        .setMessage("确定要投降吗？投降后将结束游戏。")
-        .setPositiveButton("确定", (dialog, which) -> {
-          socketManager.sendSurrender();
-          Toast.makeText(this, "已发送投降请求", Toast.LENGTH_SHORT).show();
-
-          // 禁用投降按钮，防止重复点击
-          btnSurrender.setEnabled(false);
-
-          // 设置超时退出，防止服务器响应丢失的情况
-          btnSurrender.postDelayed(() -> {
-            if (!isFinishing()) {
-              Toast.makeText(this, "投降成功，退出房间", Toast.LENGTH_SHORT).show();
-              finish();
-            }
-          }, 3000); // 3秒后强制退出
-        })
-        .setNegativeButton("取消", null)
-        .show();
+    Toast.makeText(this, "请在游戏界面进行投降操作", Toast.LENGTH_SHORT).show();
   }
 
   /**
@@ -496,6 +518,8 @@ public class RoomDetailActivity extends BaseActivity implements SocketEventListe
         .setPositiveButton("确定", (dialog, which) -> onQuitRoomClicked())
         .setNegativeButton("取消", null)
         .show();
+
+    super.onBackPressed();
   }
 
   @Override

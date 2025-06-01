@@ -10,10 +10,12 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.Nullable;
+import androidx.appcompat.app.AlertDialog;
 
 import com.google.gson.JsonObject;
 import com.mimeng.chess.R;
 import com.mimeng.chess.entity.chess.ChessGameState;
+import com.mimeng.chess.entity.chess.ChessPiece;
 import com.mimeng.chess.entity.chess.Position;
 import com.mimeng.chess.entity.chess.Move;
 import com.mimeng.chess.entity.chess.PlayerColor;
@@ -35,6 +37,9 @@ public class GameActivity extends BaseActivity implements SocketEventListener {
   private static final String TAG = "GameActivity";
   private static final String EXTRA_ROOM_ID = "room_id";
   private static final String EXTRA_GAME_STATE = "game_state";
+
+  // 添加结果码常量
+  public static final int RESULT_GAME_ENDED = 100;
 
   // UI组件
   private ChessBoardView chessBoardView;
@@ -111,6 +116,26 @@ public class GameActivity extends BaseActivity implements SocketEventListener {
   }
 
   /**
+   * 获取当前用户ID
+   */
+  private String getUserId() {
+    try {
+      AuthManager authManager = AuthManager.getInstance(this);
+      com.mimeng.chess.api.auth.LoginRes.User user = authManager.getUser();
+      if (user != null) {
+        // 强制返回字符串类型
+        String userId = String.valueOf(user.id);
+        Log.d(TAG, "getUserId: " + userId);
+        return userId;
+      }
+    } catch (Exception e) {
+      Log.e(TAG, "Failed to get user ID", e);
+    }
+    Log.w(TAG, "getUserId: null");
+    return null;
+  }
+
+  /**
    * 解析游戏状态JSON
    */
   private void parseGameState(String gameStateJson) {
@@ -123,8 +148,11 @@ public class GameActivity extends BaseActivity implements SocketEventListener {
 
       // 获取当前用户ID，确定玩家颜色
       String myUserId = getUserId();
+      Log.d(TAG, "parseGameState: myUserId=" + myUserId);
+
       if (myUserId != null) {
         myColor = GameStateJsonUtils.determineMyColor(jsonObject, myUserId);
+        Log.d(TAG, "parseGameState: determined myColor=" + myColor);
       } else {
         Log.w(TAG, "Unable to get user ID, defaulting to RED");
         myColor = PlayerColor.RED; // 默认红方
@@ -136,22 +164,6 @@ public class GameActivity extends BaseActivity implements SocketEventListener {
       Toast.makeText(this, "游戏状态解析失败", Toast.LENGTH_SHORT).show();
       finish();
     }
-  }
-
-  /**
-   * 获取当前用户ID
-   */
-  private String getUserId() {
-    try {
-      AuthManager authManager = AuthManager.getInstance(this);
-      com.mimeng.chess.api.auth.LoginRes.User user = authManager.getUser();
-      if (user != null) {
-        return String.valueOf(user.id);
-      }
-    } catch (Exception e) {
-      Log.e(TAG, "Failed to get user ID", e);
-    }
-    return null;
   }
 
   /**
@@ -171,13 +183,8 @@ public class GameActivity extends BaseActivity implements SocketEventListener {
       }
     });
 
-    // 投降按钮
-    btnSurrender.setOnClickListener(v -> {
-      // TODO: 显示确认对话框
-      if (socketManager != null) {
-        socketManager.sendSurrender();
-      }
-    });
+    // 投降按钮 - 添加确认对话框
+    btnSurrender.setOnClickListener(v -> onSurrenderClicked());
 
     // 悔棋按钮
     btnUndo.setOnClickListener(v -> {
@@ -198,6 +205,37 @@ public class GameActivity extends BaseActivity implements SocketEventListener {
   }
 
   /**
+   * 投降操作 - 从RoomDetailActivity移动过来
+   */
+  private void onSurrenderClicked() {
+    if (socketManager == null || !socketManager.isConnected()) {
+      Toast.makeText(this, "连接断开，无法投降", Toast.LENGTH_SHORT).show();
+      return;
+    }
+
+    new AlertDialog.Builder(this)
+        .setTitle("投降确认")
+        .setMessage("确定要投降吗？投降后将结束游戏并返回房间。")
+        .setPositiveButton("确定", (dialog, which) -> {
+          socketManager.sendSurrender();
+          Toast.makeText(this, "已发送投降请求", Toast.LENGTH_SHORT).show();
+
+          // 禁用投降按钮，防止重复点击
+          btnSurrender.setEnabled(false);
+
+          // 设置超时退出，防止服务器响应丢失的情况
+          btnSurrender.postDelayed(() -> {
+            if (!isFinishing()) {
+              Toast.makeText(this, "投降成功，退出游戏", Toast.LENGTH_SHORT).show();
+              finish();
+            }
+          }, 3000); // 3秒后强制退出
+        })
+        .setNegativeButton("取消", null)
+        .show();
+  }
+
+  /**
    * 处理棋子点击事件
    */
   private void handlePieceClick(Position position) {
@@ -205,9 +243,32 @@ public class GameActivity extends BaseActivity implements SocketEventListener {
       return;
 
     // 检查是否轮到当前玩家
+    Log.d(TAG, "handlePieceClick: myColor=" + myColor + ", currentPlayer=" + gameState.getCurrentPlayer()
+        + ", position=" + position);
     if (gameState.getCurrentPlayer() != myColor) {
-      Toast.makeText(this, "还没轮到您下棋", Toast.LENGTH_SHORT).show();
+      String message = "还没轮到您下棋 (当前: " + gameState.getCurrentPlayer() + ", 您是: " + myColor + ")";
+      Log.d(TAG, message);
+      Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
       return;
+    }
+
+    // 获取点击位置的棋子
+    ChessPiece piece = gameState.getBoard().getPieceAt(position);
+
+    // 如果点击的是己方棋子，选中并显示可移动位置
+    if (piece != null && piece.getColor() == myColor) {
+      // 选中棋子
+      chessBoardView.setSelectedPosition(position);
+
+      // 获取并显示可移动位置
+      List<Position> validMoves = gameState.getValidMovesForPiece(position);
+      chessBoardView.setAvailableMoves(validMoves);
+
+      Log.d(TAG, "Selected piece at " + position + ", found " + validMoves.size() + " valid moves");
+    } else if (piece == null || piece.getColor() != myColor) {
+      // 点击空位或敌方棋子，清除选择
+      chessBoardView.setSelectedPosition(null);
+      chessBoardView.setAvailableMoves(new ArrayList<>());
     }
 
     // 向服务端发送选择棋子事件
@@ -230,22 +291,36 @@ public class GameActivity extends BaseActivity implements SocketEventListener {
       return;
 
     // 检查是否轮到当前玩家
+    Log.d(TAG, "handleMoveComplete: myColor=" + myColor + ", currentPlayer=" + gameState.getCurrentPlayer() + ", from="
+        + from + ", to=" + to);
     if (gameState.getCurrentPlayer() != myColor) {
+      String message = "还没轮到您下棋 (当前: " + gameState.getCurrentPlayer() + ", 您是: " + myColor + ")";
+      Log.d(TAG, message);
       return;
     }
 
-    // 向服务端发送移动事件
-    // TODO: SocketManager 中没有 movePiece 方法，需要确认正确的事件名和参数
-    // socketManager.movePiece(from.getRow(), from.getCol(), to.getRow(),
-    // to.getCol());
-    Log.d(TAG, "Move piece from " + from + " to " + to + " - event not sent, method missing in SocketManager");
+    // 清除选择状态和可移动位置显示
+    chessBoardView.setSelectedPosition(null);
+    chessBoardView.setAvailableMoves(new ArrayList<>()); // 向服务端发送移动事件
     if (socketManager != null) {
       JsonObject moveData = new JsonObject();
-      moveData.addProperty("fromRow", from.getRow());
-      moveData.addProperty("fromCol", from.getCol());
-      moveData.addProperty("toRow", to.getRow());
-      moveData.addProperty("toCol", to.getCol());
-      socketManager.emit("move_piece", moveData); // 假设事件名为 "move_piece"
+
+      // 创建 from 对象
+      JsonObject fromObj = new JsonObject();
+      fromObj.addProperty("row", from.getRow());
+      fromObj.addProperty("col", from.getCol());
+
+      // 创建 to 对象
+      JsonObject toObj = new JsonObject();
+      toObj.addProperty("row", to.getRow());
+      toObj.addProperty("col", to.getCol());
+
+      // 添加到主对象
+      moveData.add("from", fromObj);
+      moveData.add("to", toObj);
+
+      socketManager.emit("move_piece", moveData);
+      Log.d(TAG, "Sent move_piece event: " + moveData.toString());
     }
   }
 
@@ -306,12 +381,21 @@ public class GameActivity extends BaseActivity implements SocketEventListener {
         break;
       case RED_WIN:
         tvGameStatus.setText("红方获胜");
+        // 游戏结束，设置结果码并关闭Activity
+        setResult(RESULT_GAME_ENDED);
+        finish();
         break;
       case BLACK_WIN:
         tvGameStatus.setText("黑方获胜");
+        // 游戏结束，设置结果码并关闭Activity
+        setResult(RESULT_GAME_ENDED);
+        finish();
         break;
       case DRAW:
         tvGameStatus.setText("平局");
+        // 游戏结束，设置结果码并关闭Activity
+        setResult(RESULT_GAME_ENDED);
+        finish();
         break;
       default:
         tvGameStatus.setText("等待开始");
@@ -322,6 +406,10 @@ public class GameActivity extends BaseActivity implements SocketEventListener {
   @Override
   protected void onDestroy() {
     super.onDestroy();
+
+    // 设置结果码，通知调用者游戏已结束，需要刷新列表
+    setResult(RESULT_GAME_ENDED);
+
     // 清理Socket监听器
     if (socketManager != null) {
       socketManager.unregisterListener(this);
@@ -375,8 +463,12 @@ public class GameActivity extends BaseActivity implements SocketEventListener {
   public void onPlayerLeft(JsonObject data) {
     Log.d(TAG, "Player left: " + data.toString());
     runOnUiThread(() -> {
-      Toast.makeText(this, "对手离开了游戏", Toast.LENGTH_LONG).show();
-      // TODO: 暂停游戏或结束游戏
+      Toast.makeText(this, "对手离开了游戏，您获得胜利！", Toast.LENGTH_LONG).show();
+      // 延迟2秒后退出活动，让用户看到消息
+      chessBoardView.postDelayed(() -> {
+        setResult(RESULT_GAME_ENDED);
+        finish();
+      }, 2000);
     });
   }
 
@@ -403,14 +495,69 @@ public class GameActivity extends BaseActivity implements SocketEventListener {
     Log.d(TAG, "Game state received: " + data.toString());
     runOnUiThread(() -> {
       try {
-        // 假设 gameState 包含完整的游戏状态，可以直接用于更新
-        this.gameState = GameStateJsonUtils.parseGameState(data, roomId);
+        // 重新确定玩家颜色，以防之前判断错误
+        String myUserId = getUserId();
+        if (myUserId != null) {
+          PlayerColor newMyColor = GameStateJsonUtils.determineMyColor(data, myUserId);
+          if (newMyColor != myColor) {
+            Log.d(TAG, "Player color changed from " + myColor + " to " + newMyColor);
+            myColor = newMyColor;
+          }
+        }
+
+        // 解析新的游戏状态
+        ChessGameState newGameState = GameStateJsonUtils.parseGameState(data, roomId);
+        Log.d(TAG, "Parsed game state - Current player: " + newGameState.getCurrentPlayer() +
+            ", Status: " + newGameState.getStatus() + ", My color: " + myColor);
+
+        // 检查棋盘是否有变化
+        if (this.gameState != null && newGameState.getBoard() != null) {
+          Log.d(TAG, "Updating game state - board pieces count may have changed");
+        }
+
+        // 验证棋盘解析是否成功
+        if (newGameState.getBoard() != null) {
+          int pieceCount = 0;
+          StringBuilder boardDebug = new StringBuilder();
+          for (int row = 0; row < 10; row++) {
+            for (int col = 0; col < 9; col++) {
+              ChessPiece p = newGameState.getBoard().getPieceAt(new Position(row, col));
+              if (p != null) {
+                pieceCount++;
+                boardDebug
+                    .append("[" + row + "," + col + "] " + p.getClass().getSimpleName() + " " + p.getColor() + "; ");
+              }
+            }
+          }
+          Log.d(TAG, "Parsed board contains " + pieceCount + " pieces");
+          Log.d(TAG, "Board detail: " + boardDebug.toString());
+        } else {
+          Log.w(TAG, "Failed to parse board from game state");
+        }
+
+        this.gameState = newGameState;
+
         // 清除选中状态和可移动位置
         if (chessBoardView != null) {
           chessBoardView.setSelectedPosition(null);
           chessBoardView.setAvailableMoves(new ArrayList<>());
+
+          // 强制刷新棋盘 - 多重保险
+          Log.d(TAG, "Updating chess board with new game state");
+          chessBoardView.setGameState(gameState);
+
+          // 添加延迟刷新确保绘制完成
+          chessBoardView.post(new Runnable() {
+            @Override
+            public void run() {
+              chessBoardView.invalidate();
+              Log.d(TAG, "Delayed invalidation completed");
+            }
+          });
         }
+
         updateUI();
+        Log.d(TAG, "Game state update completed");
       } catch (Exception e) {
         Log.e(TAG, "Failed to handle game state update", e);
       }
@@ -466,10 +613,15 @@ public class GameActivity extends BaseActivity implements SocketEventListener {
 
         Toast.makeText(this, message, Toast.LENGTH_LONG).show();
 
-        // TODO: 显示游戏结果对话框，询问是否返回房间或退出
+        // 游戏结束后设置结果码并关闭Activity
+        setResult(RESULT_GAME_ENDED);
+        finish();
       } catch (Exception e) {
         Log.e(TAG, "Failed to handle game ended", e);
         Toast.makeText(this, "游戏结束", Toast.LENGTH_LONG).show();
+        // 即使解析失败也要设置结果码并关闭Activity
+        setResult(RESULT_GAME_ENDED);
+        finish();
       }
     });
   }
@@ -483,31 +635,20 @@ public class GameActivity extends BaseActivity implements SocketEventListener {
       } catch (Exception e) {
         Toast.makeText(this, "有玩家投降，游戏结束", Toast.LENGTH_LONG).show();
       }
+
+      // 投降后设置结果码并关闭Activity，返回房间或上一个界面
+      setResult(RESULT_GAME_ENDED);
+      finish();
     });
   }
-
-  // onMoveUndone 已被 onGameState 或类似的通用状态更新事件取代，注释掉
-  // @Override
-  // public void onMoveUndone(JsonObject data) {
-  // runOnUiThread(() -> {
-  // try {
-  // // TODO: 更新棋盘状态，撤销上一步移动
-  // // 同样，这可能通过接收新的 gameState 来实现
-  // Log.d(TAG, "Move undone: " + data.toString());
-  // Toast.makeText(this, "悔棋成功", Toast.LENGTH_SHORT).show();
-  // // parseGameState(data.toString()); // 如果悔棋后服务端发送完整状态
-  // } catch (Exception e) {
-  // Log.e(TAG, "Failed to handle move undone", e);
-  // }
-  // });
-  // }
 
   @Override
   public void onRoomClosing(JsonObject data) {
     Log.d(TAG, "Room closing: " + data.toString());
     runOnUiThread(() -> {
-      String reason = data.has("reason") ? data.get("reason").getAsString() : "未知原因";
-      Toast.makeText(this, "房间即将关闭: " + reason, Toast.LENGTH_LONG).show();
+      Toast.makeText(this, "房间即将关闭", Toast.LENGTH_LONG).show();
+      setResult(RESULT_GAME_ENDED);
+      finish(); // 直接退出Activity
     });
   }
 
@@ -516,6 +657,7 @@ public class GameActivity extends BaseActivity implements SocketEventListener {
     Log.d(TAG, "Room closed: " + message);
     runOnUiThread(() -> {
       Toast.makeText(this, "房间已关闭: " + message, Toast.LENGTH_LONG).show();
+      setResult(RESULT_GAME_ENDED);
       finish(); // 关闭 GameActivity
     });
   }
@@ -527,5 +669,48 @@ public class GameActivity extends BaseActivity implements SocketEventListener {
     runOnUiThread(() -> {
       Toast.makeText(this, "错误: " + error, Toast.LENGTH_LONG).show();
     });
+  }
+
+  @Override
+  public void onPlayerColorAssigned(JsonObject data) {
+    Log.d(TAG, "Player color assigned: " + data.toString());
+    runOnUiThread(() -> {
+      try {
+        if (data.has("color")) {
+          String colorStr = data.get("color").getAsString();
+          PlayerColor newColor = "red".equalsIgnoreCase(colorStr) ? PlayerColor.RED : PlayerColor.BLACK;
+          Log.d(TAG, "Color assigned: " + newColor);
+
+          if (newColor != myColor) {
+            Log.d(TAG, "Updating player color from " + myColor + " to " + newColor);
+            myColor = newColor;
+            updateUI();
+
+            if (chessBoardView != null) {
+              chessBoardView.setPlayerColor(myColor);
+            }
+          }
+        }
+      } catch (Exception e) {
+        Log.e(TAG, "Failed to handle player color assignment", e);
+      }
+    });
+  }
+
+  @Override
+  public void onBackPressed() {
+    // 游戏进行中禁止直接返回，需要先投降
+    new AlertDialog.Builder(this)
+        .setTitle("退出游戏")
+        .setMessage("游戏进行中，确定要投降并退出吗？")
+        .setPositiveButton("投降退出", (dialog, which) -> {
+          if (socketManager != null && socketManager.isConnected()) {
+            socketManager.sendSurrender();
+          }
+          setResult(RESULT_GAME_ENDED);
+          finish();
+        })
+        .setNegativeButton("继续游戏", null)
+        .show();
   }
 }
