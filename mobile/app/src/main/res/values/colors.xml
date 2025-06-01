@@ -19,12 +19,17 @@
     <color name="outline">#E0E0E0</color>
     <color name="text_primary">#212121</color>
     <color name="text_secondary">#757575</color>
-    <color name="text_hint">#9E9E9E</color>
-
-    <!-- Accent Colors -->
+    <color name="text_hint">#9E9E9E</color>    <!-- Accent Colors -->
     <color name="success_green">#4CAF50</color>
     <color name="warning_orange">#FF9800</color>
     <color name="error_red">#F44336</color>
+
+    <!-- Game UI Colors -->
+    <color name="background_primary">#F5F5DC</color>
+    <color name="red_player">#F44336</color>
+    <color name="black_player">#424242</color>
+    <color name="button_text">#FFFFFF</color>
+    <color name="button_text_danger">#FFFFFF</color>
 
     <!-- Standard Colors -->
     <color name="black">#FF000000</color>

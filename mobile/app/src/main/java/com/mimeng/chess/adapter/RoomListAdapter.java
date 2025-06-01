@@ -10,7 +10,7 @@ import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.mimeng.chess.R;
-import com.mimeng.chess.api.room.Room;
+import com.mimeng.chess.entity.chess.Room;
 import com.mimeng.chess.utils.AuthManager;
 
 import java.util.ArrayList;
@@ -92,9 +92,9 @@ public class RoomListAdapter extends RecyclerView.Adapter<RoomListAdapter.RoomVi
 
     public void bind(Room room) {
       // 设置房间信息
-      tvRoomName.setText(room.name != null ? room.name : "房间-" + room.id.substring(0, 8));
+      tvRoomName.setText(room.getName() != null ? room.getName() : "房间-" + room.getId().substring(0, 8));
       tvRoomStatus.setText(room.getStatusText());
-      tvRoomId.setText("ID: " + room.id.substring(0, 8) + "...");
+      tvRoomId.setText("ID: " + room.getId().substring(0, 8) + "...");
       tvPlayerInfo.setText(room.getPlayerInfoText());
 
       // 设置状态背景颜色
@@ -107,7 +107,7 @@ public class RoomListAdapter extends RecyclerView.Adapter<RoomListAdapter.RoomVi
 
     private void updateStatusBackground(Room room) {
       int backgroundColor;
-      switch (room.status) {
+      switch (room.getStatus()) {
         case Room.Status.WAITING:
           backgroundColor = 0xFF4CAF50; // 绿色
           break;

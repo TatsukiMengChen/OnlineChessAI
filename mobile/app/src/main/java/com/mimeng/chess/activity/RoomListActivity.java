@@ -15,7 +15,7 @@ import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.google.gson.Gson;
 import com.mimeng.chess.R;
 import com.mimeng.chess.adapter.RoomListAdapter;
-import com.mimeng.chess.api.room.Room;
+import com.mimeng.chess.entity.chess.Room;
 import com.mimeng.chess.api.room.RoomApi;
 import com.mimeng.chess.api.room.RoomListRes;
 import com.mimeng.chess.api.ApiResponse;
@@ -162,14 +162,21 @@ public class RoomListActivity extends BaseActivity implements RoomListAdapter.On
                 adapter.updateRooms(rooms);
 
                 // 检查自己是否是player1或player2，且房间未关闭
-                int myUserId = authManager.getUser() != null ? authManager.getUser().id : -1;
-                if (rooms != null) {
+                // int myUserId = authManager.getUser() != null ? authManager.getUser().id : -1;
+                // The user ID from authManager is an int. Room player IDs are Long.
+                // We need to use Long for comparison if we are to use .equals()
+                Long myUserId = authManager.getUser() != null ? Long.valueOf(authManager.getUser().id) : null;
+
+                if (rooms != null && myUserId != null) { // Add null check for myUserId
                   for (Room room : rooms) {
-                    boolean isMine = (room.player1Id != null && room.player1Id == myUserId)
-                        || (room.player2Id != null && room.player2Id == myUserId);
-                    if (isMine && !Room.Status.CLOSED.equals(room.status)) {
-                      RoomDetailActivity.start(RoomListActivity.this, room.id, room.name);
-                      return;
+                    boolean isPlayer1 = myUserId.equals(room.getPlayer1Id());
+                    boolean isPlayer2 = myUserId.equals(room.getPlayer2Id());
+
+                    if ((isPlayer1 || isPlayer2) && !Room.Status.CLOSED.equals(room.getStatus())) {
+                      // 如果玩家是房间成员并且房间未关闭，则直接进入房间详情
+                      RoomDetailActivity.start(RoomListActivity.this, room.getId(), room.getName());
+                      // finish(); // Potentially finish RoomListActivity after navigating
+                      return; // Exit after finding and navigating to the room
                     }
                   }
                 }
@@ -209,8 +216,8 @@ public class RoomListActivity extends BaseActivity implements RoomListAdapter.On
     CreateRoomDialog dialog = new CreateRoomDialog(this);
     dialog.setOnRoomCreatedListener(room -> {
       // 房间创建成功，保存本地并跳转
-      saveMyCreatedRoom(room.id, room.name);
-      RoomDetailActivity.start(RoomListActivity.this, room.id, room.name);
+      saveMyCreatedRoom(room.getId(), room.getName());
+      RoomDetailActivity.start(RoomListActivity.this, room.getId(), room.getName());
     });
     dialog.show();
   }
@@ -247,7 +254,7 @@ public class RoomListActivity extends BaseActivity implements RoomListAdapter.On
   public void onJoinRoom(Room room) {
     new AlertDialog.Builder(this)
         .setTitle("加入房间")
-        .setMessage("确定要加入房间 \"" + room.name + "\" 吗？")
+        .setMessage("确定要加入房间 \"" + room.getName() + "\" 吗？")
         .setPositiveButton("确定", (dialog, which) -> performJoinRoom(room))
         .setNegativeButton("取消", null)
         .show();
@@ -257,7 +264,7 @@ public class RoomListActivity extends BaseActivity implements RoomListAdapter.On
   public void onQuitRoom(Room room) {
     new AlertDialog.Builder(this)
         .setTitle("退出房间")
-        .setMessage("确定要退出房间 \"" + room.name + "\" 吗？")
+        .setMessage("确定要退出房间 \"" + room.getName() + "\" 吗？")
         .setPositiveButton("确定", (dialog, which) -> performQuitRoom(room))
         .setNegativeButton("取消", null)
         .show();
@@ -267,7 +274,7 @@ public class RoomListActivity extends BaseActivity implements RoomListAdapter.On
   public void onCloseRoom(Room room) {
     new AlertDialog.Builder(this)
         .setTitle("关闭房间")
-        .setMessage("确定要关闭房间 \"" + room.name + "\" 吗？\n关闭后房间将无法再使用。")
+        .setMessage("确定要关闭房间 \"" + room.getName() + "\" 吗？\n关闭后房间将无法再使用。")
         .setPositiveButton("确定", (dialog, which) -> performCloseRoom(room))
         .setNegativeButton("取消", null)
         .show();
@@ -277,7 +284,7 @@ public class RoomListActivity extends BaseActivity implements RoomListAdapter.On
    * 执行加入房间操作
    */
   private void performJoinRoom(Room room) {
-    roomApi.joinRoom(room.id, new Callback() {
+    roomApi.joinRoom(room.getId(), new Callback() {
       @Override
       public void onFailure(Call call, IOException e) {
         runOnUiThread(() -> showMessage("网络错误，请检查网络连接"));
@@ -296,7 +303,13 @@ public class RoomListActivity extends BaseActivity implements RoomListAdapter.On
 
               if (apiResponse.code == 200) {
                 showMessage("成功加入房间");
-                loadRoomList(); // 刷新列表
+                // After successfully joining, navigate to RoomDetailActivity
+                // The API response for joinRoom should ideally return the updated Room object
+                // or its ID and name.
+                // Assuming 'room' parameter to performJoinRoom is the one to navigate to.
+                RoomDetailActivity.start(RoomListActivity.this, room.getId(), room.getName());
+                // finish(); // Optional: finish RoomListActivity
+                // loadRoomList(); // No longer needed if navigating away
               } else {
                 showMessage(apiResponse.msg != null ? apiResponse.msg : "加入房间失败");
               }
@@ -321,7 +334,7 @@ public class RoomListActivity extends BaseActivity implements RoomListAdapter.On
    * 执行退出房间操作
    */
   private void performQuitRoom(Room room) {
-    roomApi.quitRoom(room.id, new Callback() {
+    roomApi.quitRoom(room.getId(), new Callback() {
       @Override
       public void onFailure(Call call, IOException e) {
         runOnUiThread(() -> showMessage("网络错误，请检查网络连接"));
@@ -364,7 +377,7 @@ public class RoomListActivity extends BaseActivity implements RoomListAdapter.On
    * 执行关闭房间操作
    */
   private void performCloseRoom(Room room) {
-    roomApi.closeRoom(room.id, new Callback() {
+    roomApi.closeRoom(room.getId(), new Callback() {
       @Override
       public void onFailure(Call call, IOException e) {
         runOnUiThread(() -> showMessage("网络错误，请检查网络连接"));

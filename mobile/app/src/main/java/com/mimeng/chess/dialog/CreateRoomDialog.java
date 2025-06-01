@@ -6,7 +6,6 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.text.TextUtils;
-import android.view.View;
 import android.view.Window;
 import android.widget.EditText;
 import android.widget.Toast;
@@ -17,7 +16,7 @@ import android.widget.Button;
 import com.google.gson.Gson;
 import com.mimeng.chess.R;
 import com.mimeng.chess.api.room.CreateRoomReq;
-import com.mimeng.chess.api.room.Room;
+import com.mimeng.chess.entity.chess.Room;
 import com.mimeng.chess.api.room.RoomApi;
 import com.mimeng.chess.api.ApiResponse;
 

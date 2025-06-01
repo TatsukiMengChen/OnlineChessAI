@@ -102,8 +102,8 @@ public class RoomDetailActivity extends BaseActivity implements SocketEventListe
   }
 
   private void initSocketConnection() {
-    socketManager = new SocketManager(roomId, this, this);
-    socketManager.connect();
+    socketManager = SocketManager.getInstance(this);
+    socketManager.registerListener(this, roomId);
   }
 
   // SocketEventListener 接口实现
@@ -206,11 +206,10 @@ public class RoomDetailActivity extends BaseActivity implements SocketEventListe
       btnStartGame.setVisibility(View.GONE);
       btnQuitRoom.setVisibility(View.GONE);
       btnSurrender.setVisibility(View.VISIBLE);
-
       Toast.makeText(this, "游戏开始！", Toast.LENGTH_SHORT).show();
 
-      // TODO: 跳转到游戏界面
-      // GameActivity.start(this, roomId, gameState);
+      // 跳转到游戏界面
+      GameActivity.start(this, roomId, gameState);
     });
   }
 
@@ -503,7 +502,7 @@ public class RoomDetailActivity extends BaseActivity implements SocketEventListe
   protected void onDestroy() {
     super.onDestroy();
     if (socketManager != null) {
-      socketManager.disconnect();
+      socketManager.unregisterListener(this);
     }
   }
 }

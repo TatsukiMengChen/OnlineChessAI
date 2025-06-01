@@ -1,7 +1,6 @@
 package com.mimeng.chess.entity.chess;
 
-import com.mimeng.chess.entity.Room;
-import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter; // Keep if needed for parsing/formatting
 import java.util.ArrayList;
 import java.util.List;
 
@@ -25,7 +24,7 @@ public class ChessRoom extends Room {
   private int maxUndoCount; // 最大悔棋次数
 
   // 房间状态
-  private LocalDateTime lastActivity; // 最后活动时间
+  private String lastActivity; // 最后活动时间
   private int totalGames; // 总游戏局数
   private int redWins; // 红方胜局
   private int blackWins; // 黑方胜局
@@ -40,7 +39,7 @@ public class ChessRoom extends Room {
     this.gameTimeLimit = 30; // 30分钟
     this.enableUndo = true;
     this.maxUndoCount = 3;
-    this.lastActivity = LocalDateTime.now();
+    this.lastActivity = getCurrentTimestampString(); // Placeholder for current time as string
     this.totalGames = 0;
     this.redWins = 0;
     this.blackWins = 0;
@@ -324,8 +323,9 @@ public class ChessRoom extends Room {
    * 更新最后活动时间
    */
   private void updateLastActivity() {
-    this.lastActivity = LocalDateTime.now();
-    this.setUpdatedAt(LocalDateTime.now());
+    String now = getCurrentTimestampString();
+    this.lastActivity = now;
+    this.setUpdatedAt(now); // Assumes Room.setUpdatedAt takes a String
   }
 
   /**
@@ -404,7 +404,7 @@ public class ChessRoom extends Room {
     this.maxUndoCount = maxUndoCount;
   }
 
-  public LocalDateTime getLastActivity() {
+  public String getLastActivity() {
     return lastActivity;
   }
 
@@ -422,5 +422,20 @@ public class ChessRoom extends Room {
 
   public int getDraws() {
     return draws;
+  }
+
+  // Helper method to get current timestamp as String (example)
+  // You might want a more robust way to get/format timestamps
+  private String getCurrentTimestampString() {
+    // Using a simple format, adjust as needed
+    // If you have a specific string format from backend, use that
+    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+      return java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME);
+    } else {
+      // Fallback for older Android versions, or use a library like ThreeTenABP
+      java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS",
+          java.util.Locale.getDefault());
+      return sdf.format(new java.util.Date());
+    }
   }
 }

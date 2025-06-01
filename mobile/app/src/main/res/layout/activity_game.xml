@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+  xmlns:app="http://schemas.android.com/apk/res-auto"
+  xmlns:tools="http://schemas.android.com/tools"
+  android:layout_width="match_parent"
+  android:layout_height="match_parent"
+  android:orientation="vertical"
+  android:background="@color/background_primary"
+  android:padding="16dp"
+  tools:context=".activity.GameActivity">
+
+  <!-- 游戏状态和计时器区域 -->
+  <LinearLayout
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="@drawable/card_background"
+    android:padding="12dp"
+    android:layout_marginBottom="16dp">
+
+    <!-- 游戏状态 -->
+    <TextView
+      android:id="@+id/tv_game_status"
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:text="游戏进行中"
+      android:textSize="18sp"
+      android:textStyle="bold"
+      android:textColor="@color/text_primary"
+      android:gravity="center"
+      android:layout_marginBottom="8dp" />
+
+    <!-- 当前玩家 -->
+    <TextView
+      android:id="@+id/tv_current_player"
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:text="当前回合: 红方"
+      android:textSize="16sp"
+      android:textColor="@color/text_secondary"
+      android:gravity="center"
+      android:layout_marginBottom="8dp" />
+
+    <!-- 计时器区域 -->
+    <LinearLayout
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:orientation="horizontal"
+      android:gravity="center">
+
+      <!-- 红方计时器 -->
+      <TextView
+        android:id="@+id/tv_red_timer"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:text="红方: 15:00"
+        android:textSize="14sp"
+        android:textColor="@color/red_player"
+        android:gravity="center"
+        android:background="@drawable/timer_background_red"
+        android:padding="8dp"
+        android:visibility="gone" />
+
+      <View
+        android:layout_width="16dp"
+        android:layout_height="1dp" />
+
+      <!-- 黑方计时器 -->
+      <TextView
+        android:id="@+id/tv_black_timer"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:text="黑方: 15:00"
+        android:textSize="14sp"
+        android:textColor="@color/black_player"
+        android:gravity="center"
+        android:background="@drawable/timer_background_black"
+        android:padding="8dp"
+        android:visibility="gone" />
+
+    </LinearLayout>
+
+  </LinearLayout>
+
+  <!-- 棋盘区域 -->
+  <FrameLayout
+    android:layout_width="match_parent"
+    android:layout_height="0dp"
+    android:layout_weight="1"
+    android:background="@drawable/chess_board_frame">
+
+    <com.mimeng.chess.view.ChessBoardView
+      android:id="@+id/chess_board_view"
+      android:layout_width="match_parent"
+      android:layout_height="match_parent"
+      android:layout_margin="8dp" />
+
+  </FrameLayout>
+
+  <!-- 游戏控制按钮区域 -->
+  <LinearLayout
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:layout_marginTop="16dp"
+    android:gravity="center">
+
+    <!-- 悔棋按钮 -->
+    <Button
+      android:id="@+id/btn_undo"
+      android:layout_width="0dp"
+      android:layout_height="48dp"
+      android:layout_weight="1"
+      android:text="悔棋"
+      android:textSize="16sp"
+      android:textColor="@color/button_text"
+      android:background="@drawable/button_secondary"
+      android:layout_marginEnd="8dp"
+      style="?android:attr/buttonBarButtonStyle" />
+
+    <!-- 投降按钮 -->
+    <Button
+      android:id="@+id/btn_surrender"
+      android:layout_width="0dp"
+      android:layout_height="48dp"
+      android:layout_weight="1"
+      android:text="投降"
+      android:textSize="16sp"
+      android:textColor="@color/button_text_danger"
+      android:background="@drawable/button_danger"
+      android:layout_marginStart="8dp"
+      style="?android:attr/buttonBarButtonStyle" />
+
+  </LinearLayout>
+
+</LinearLayout>

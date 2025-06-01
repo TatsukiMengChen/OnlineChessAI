@@ -18,6 +18,14 @@ public class Move {
     this.capturedPiece = capturedPiece;
   }
 
+  /**
+   * 构造函数，仅包含起始和目标位置。
+   * 移动的棋子和被吃的棋子将为 null。
+   */
+  public Move(Position from, Position to) {
+    this(from, to, null, null);
+  }
+
   public Position getFrom() {
     return from;
   }

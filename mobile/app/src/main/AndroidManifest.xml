@@ -18,7 +18,7 @@
         <activity
             android:name="com.mimeng.chess.activity.SplashActivity"
             android:exported="true"
-            android:screenOrientation="fullSensor"
+            android:screenOrientation="portrait"
             android:theme="@style/Theme.OnlineChessAI"
             tools:ignore="DiscouragedApi">
             <intent-filter>
@@ -58,11 +58,14 @@
             android:name="com.mimeng.chess.activity.RoomDetailActivity"
             android:exported="false"
             android:screenOrientation="portrait"
-            android:theme="@style/Theme.OnlineChessAI" />
-
-        <!-- 房间列表页 -->
+            android:theme="@style/Theme.OnlineChessAI" />        <!-- 房间列表页 -->
         <activity
             android:name="com.mimeng.chess.activity.RoomListActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.OnlineChessAI" />        <!-- 游戏界面 -->
+        <activity
+            android:name="com.mimeng.chess.activity.GameActivity"
             android:exported="false"
             android:screenOrientation="portrait"
             android:theme="@style/Theme.OnlineChessAI" />
