@@ -1,141 +1,150 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.coordinatorlayout.widget.CoordinatorLayout
+  xmlns:android="http://schemas.android.com/apk/res/android"
   xmlns:app="http://schemas.android.com/apk/res-auto"
   android:layout_width="match_parent"
   android:layout_height="match_parent"
-  android:background="#f5f5f5"
-  android:orientation="vertical">
+  android:background="?android:attr/colorBackground">
 
   <!-- 顶部工具栏 -->
   <LinearLayout
     android:id="@+id/toolbar"
     android:layout_width="match_parent"
-    android:layout_height="56dp"
-    android:background="@android:color/white"
-    android:elevation="4dp"
+    android:layout_height="wrap_content"
+    android:minHeight="56dp"
+    android:background="?android:attr/colorBackground"
+    android:elevation="0dp"
     android:gravity="center_vertical"
     android:orientation="horizontal"
     android:paddingHorizontal="16dp"
-    android:paddingTop="8dp">
-
+    android:paddingBottom="8dp">    <!-- 返回按钮 -->
     <ImageView
       android:id="@+id/iv_back"
-      android:layout_width="24dp"
-      android:layout_height="24dp"
+      android:layout_width="40dp"
+      android:layout_height="40dp"
+      android:background="?android:attr/selectableItemBackgroundBorderless"
       android:contentDescription="返回"
-      android:src="@android:drawable/ic_menu_revert" />
+      android:padding="8dp"
+      android:src="@android:drawable/ic_menu_revert"
+      android:tint="?attr/colorOnSurface" />
 
     <TextView
       android:layout_width="0dp"
       android:layout_height="wrap_content"
-      android:layout_marginStart="16dp"
+      android:layout_marginStart="8dp"
       android:layout_weight="1"
       android:text="房间列表"
-      android:textColor="@android:color/black"
-      android:textSize="18sp"
+      android:textColor="?attr/colorOnSurface"
+      android:textSize="20sp"
       android:textStyle="bold" />
 
-    <Button
+    <!-- 刷新按钮 -->
+    <TextView
       android:id="@+id/btn_refresh"
       android:layout_width="wrap_content"
-      android:layout_height="36dp"
-      android:background="@android:color/transparent"
+      android:layout_height="40dp"
+      android:background="?android:attr/selectableItemBackgroundBorderless"
+      android:gravity="center"
+      android:paddingHorizontal="12dp"
       android:text="刷新"
-      android:textColor="#2196F3"
-      android:textSize="14sp" />
-
+      android:textColor="?attr/colorPrimary"
+      android:textSize="14sp"
+      android:textStyle="bold" />
   </LinearLayout>
 
-  <!-- 创建房间按钮 -->
+  <!-- 主要内容区域 -->
   <LinearLayout
     android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    android:background="@android:color/white"
-    android:orientation="horizontal"
-    android:padding="16dp">
+    android:layout_height="match_parent"
+    android:orientation="vertical">
 
-    <Button
-      android:id="@+id/btn_create_room"
+    <!-- 占位的LinearLayout用于工具栏 -->
+    <View
       android:layout_width="0dp"
-      android:layout_height="48dp"
-      android:layout_weight="1"
-      android:background="#4CAF50"
-      android:text="创建房间"
-      android:textColor="@android:color/white"
-      android:textSize="16sp"
-      android:textStyle="bold" />
+      android:layout_height="0dp" />
+
+    <!-- 房间列表 -->
+    <FrameLayout
+      android:layout_width="match_parent"
+      android:layout_height="0dp"
+      android:layout_weight="1">
+      <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/rv_rooms"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:clipToPadding="false"
+        android:padding="8dp"
+        android:paddingBottom="80dp" />
+
+      <!-- 空状态提示 -->
+      <LinearLayout
+        android:id="@+id/layout_empty"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:visibility="gone">
+
+        <ImageView
+          android:layout_width="96dp"
+          android:layout_height="96dp"
+          android:alpha="0.3"
+          android:contentDescription="暂无房间"
+          android:src="@android:drawable/ic_dialog_info" />
+
+        <TextView
+          android:layout_width="wrap_content"
+          android:layout_height="wrap_content"
+          android:layout_marginTop="16dp"
+          android:text="暂无房间"
+          android:textColor="#999999"
+          android:textSize="16sp" />
+        <TextView
+          android:layout_width="wrap_content"
+          android:layout_height="wrap_content"
+          android:layout_marginTop="8dp"
+          android:text="点击右下角按钮创建一个房间吧"
+          android:textColor="#CCCCCC"
+          android:textSize="14sp" />
+
+      </LinearLayout>
+
+      <!-- 加载中提示 -->
+      <LinearLayout
+        android:id="@+id/layout_loading"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:visibility="gone">
+
+        <ProgressBar
+          android:layout_width="48dp"
+          android:layout_height="48dp" />
+
+        <TextView
+          android:layout_width="wrap_content"
+          android:layout_height="wrap_content"
+          android:layout_marginTop="16dp"
+          android:text="加载中..."
+          android:textColor="#999999"
+          android:textSize="16sp" />
+
+      </LinearLayout>
+    </FrameLayout>
 
   </LinearLayout>
+  <!-- 悬浮创建房间按钮 -->
+  <com.google.android.material.floatingactionbutton.FloatingActionButton
+    android:id="@+id/btn_create_room"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:layout_gravity="bottom|end"
+    android:layout_margin="16dp"
+    android:contentDescription="创建房间"
+    android:src="@android:drawable/ic_input_add"
+    app:backgroundTint="?attr/colorPrimary"
+    app:fabSize="normal"
+    app:tint="?attr/colorOnPrimary" />
 
-  <!-- 房间列表 -->
-  <FrameLayout
-    android:layout_width="match_parent"
-    android:layout_height="0dp"
-    android:layout_weight="1">
-
-    <androidx.recyclerview.widget.RecyclerView
-      android:id="@+id/rv_rooms"
-      android:layout_width="match_parent"
-      android:layout_height="match_parent"
-      android:padding="8dp" />
-
-    <!-- 空状态提示 -->
-    <LinearLayout
-      android:id="@+id/layout_empty"
-      android:layout_width="match_parent"
-      android:layout_height="match_parent"
-      android:gravity="center"
-      android:orientation="vertical"
-      android:visibility="gone">
-
-      <ImageView
-        android:layout_width="96dp"
-        android:layout_height="96dp"
-        android:alpha="0.3"
-        android:contentDescription="暂无房间"
-        android:src="@android:drawable/ic_dialog_info" />
-
-      <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
-        android:text="暂无房间"
-        android:textColor="#999999"
-        android:textSize="16sp" />
-
-      <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:text="点击上方按钮创建一个房间吧"
-        android:textColor="#CCCCCC"
-        android:textSize="14sp" />
-
-    </LinearLayout>
-
-    <!-- 加载中提示 -->
-    <LinearLayout
-      android:id="@+id/layout_loading"
-      android:layout_width="match_parent"
-      android:layout_height="match_parent"
-      android:gravity="center"
-      android:orientation="vertical"
-      android:visibility="gone">
-
-      <ProgressBar
-        android:layout_width="48dp"
-        android:layout_height="48dp" />
-
-      <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
-        android:text="加载中..."
-        android:textColor="#999999"
-        android:textSize="16sp" />
-
-    </LinearLayout>
-
-  </FrameLayout>
-
-</LinearLayout>
+</androidx.coordinatorlayout.widget.CoordinatorLayout>

@@ -2,7 +2,6 @@ package com.mimeng.chess.activity;
 
 import android.os.Bundle;
 import android.view.View;
-import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.Toast;
@@ -11,6 +10,7 @@ import androidx.appcompat.app.AlertDialog;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.google.gson.Gson;
 import com.mimeng.chess.R;
 import com.mimeng.chess.adapter.RoomListAdapter;
@@ -33,8 +33,8 @@ import java.util.List;
  */
 public class RoomListActivity extends BaseActivity implements RoomListAdapter.OnRoomActionListener {
   private ImageView ivBack;
-  private Button btnRefresh;
-  private Button btnCreateRoom;
+  private View btnRefresh;
+  private FloatingActionButton btnCreateRoom;
   private RecyclerView rvRooms;
   private LinearLayout layoutEmpty;
   private LinearLayout layoutLoading;
@@ -48,15 +48,22 @@ public class RoomListActivity extends BaseActivity implements RoomListAdapter.On
   protected void onCreate(Bundle savedInstanceState) {
     super.onCreate(savedInstanceState);
 
-    // 删除标题栏
+    // 删除标题栏，使用自定义工具栏
     if (getSupportActionBar() != null) {
       getSupportActionBar().hide();
     }
 
     setContentView(R.layout.activity_room_list);
 
-    // 应用仅状态栏的内边距策略
-    applyStatusBarOnlyInsets();
+    // 配置全面屏适配
+    // BaseActivity已经处理了沉浸式状态栏和透明设置
+    // 这里只需要设置图标颜色以适配界面主题
+
+    // 设置状态栏图标为深色（适配浅色背景的chess_cream主题）
+    setStatusBarIconsLight(false);
+
+    // 设置导航栏图标为深色（适配浅色主题）
+    setNavigationBarIconsLight(false);
 
     initData();
     initViews();
@@ -96,7 +103,7 @@ public class RoomListActivity extends BaseActivity implements RoomListAdapter.On
    * 设置窗口内边距适配
    */
   private void setupWindowInsets() {
-    // 为工具栏应用状态栏内边距
+    // 为工具栏应用状态栏内边距，让工具栏不被状态栏遮挡
     View toolbar = findViewById(R.id.toolbar);
     if (toolbar != null) {
       applyStatusBarInsets(toolbar);

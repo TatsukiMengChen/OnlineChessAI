@@ -8,12 +8,12 @@ import android.os.Looper;
 import android.text.TextUtils;
 import android.view.View;
 import android.view.Window;
-import android.widget.Button;
 import android.widget.EditText;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 
+import android.widget.Button;
 import com.google.gson.Gson;
 import com.mimeng.chess.R;
 import com.mimeng.chess.api.room.CreateRoomReq;
@@ -55,6 +55,16 @@ public class CreateRoomDialog extends Dialog {
     super.onCreate(savedInstanceState);
     requestWindowFeature(Window.FEATURE_NO_TITLE);
     setContentView(R.layout.dialog_create_room);
+
+    // 设置对话框背景为圆角
+    if (getWindow() != null) {
+      getWindow().setBackgroundDrawableResource(R.drawable.dialog_background);
+
+      // 设置对话框宽度
+      android.view.WindowManager.LayoutParams params = getWindow().getAttributes();
+      params.width = (int) (getContext().getResources().getDisplayMetrics().widthPixels * 0.85);
+      getWindow().setAttributes(params);
+    }
 
     initViews();
     setupListeners();

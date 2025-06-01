@@ -1,5 +1,4 @@
-<resources xmlns:tools="http://schemas.android.com/tools">
-    <!-- Chess Theme Application Theme -->
+<resources xmlns:tools="http://schemas.android.com/tools">    <!-- Chess Theme Application Theme -->
     <style name="Theme.OnlineChessAI" parent="Theme.MaterialComponents.DayNight.NoActionBar">
         <!-- Primary brand color. -->
         <item name="colorPrimary">@color/chess_brown_primary</item>
@@ -11,12 +10,17 @@
         <item name="colorSecondaryVariant">@color/chess_gold_dark</item>
         <item name="colorOnSecondary">@color/chess_brown_dark</item>
 
+        <!-- Error color -->
+        <item name="colorError">@color/error_red</item>
+        <item name="colorOnError">@color/white</item>
+
         <!-- Surface colors -->
         <item name="colorSurface">@color/surface_light</item>
         <item name="colorOnSurface">@color/text_primary</item>
+        <item name="colorOnSurfaceVariant">@color/text_secondary</item>
 
         <!-- Background colors -->
-        <item name="android:colorBackground">@color/chess_cream</item>        <!-- Status bar color. -->
+        <item name="android:colorBackground">@color/chess_cream</item><!-- Status bar color. -->
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:windowLightStatusBar">true</item>
 
@@ -101,11 +105,19 @@
         <item name="android:singleLine">true</item>
         <item name="android:ellipsize">end</item>
         <item name="android:gravity">center_vertical</item>
-    </style>
-
-    <!-- Circle Image Style -->
+    </style>    <!-- Circle Image Style -->
     <style name="CircleImageView">
         <item name="cornerFamily">rounded</item>
         <item name="cornerSize">50%</item>
+    </style>
+
+    <!-- Dialog Styles -->
+    <style name="Widget.Chess.Dialog" parent="Theme.MaterialComponents.Dialog">
+        <item name="android:windowBackground">@drawable/dialog_background</item>
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_marginStart">24dp</item>
+        <item name="android:layout_marginEnd">24dp</item>
+        <item name="android:windowMinWidthMajor">80%</item>
+        <item name="android:windowMinWidthMinor">90%</item>
     </style>
 </resources>
