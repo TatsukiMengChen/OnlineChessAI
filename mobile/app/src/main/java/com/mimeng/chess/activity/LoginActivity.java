@@ -294,8 +294,8 @@ public class LoginActivity extends AppCompatActivity {
    * 跳转到忘记密码页面
    */
   private void navigateToForgotPassword() {
-    // TODO: 实现忘记密码页面
-    showMessage("忘记密码功能即将上线");
+    Intent intent = new Intent(this, ForgotPasswordActivity.class);
+    startActivity(intent);
   }
 
   /**

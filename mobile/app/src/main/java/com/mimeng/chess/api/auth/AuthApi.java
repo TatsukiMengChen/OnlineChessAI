@@ -12,6 +12,7 @@ public class AuthApi extends BaseApi {
         public static final String REGISTER = BASE + "/register";
         public static final String SEND_CODE = BASE + "/sendCode";
         public static final String CHANGE_PASSWORD = BASE + "/changePassword";
+        public static final String RESET_PASSWORD = BASE + "/resetPassword";
     }
 
     public void sendCode(Object data, Callback callback) {
@@ -28,6 +29,10 @@ public class AuthApi extends BaseApi {
 
     public void changePassword(Object data, Callback callback) {
         post(urls.CHANGE_PASSWORD, data, callback);
+    }
+
+    public void resetPassword(Object data, Callback callback) {
+        post(urls.RESET_PASSWORD, data, callback);
     }
 
     // 单例实例
