@@ -4,7 +4,10 @@ import com.mimeng.chess.entity.chess.*;
 import com.mimeng.chess.service.RoomService;
 import com.mimeng.chess.entity.Room;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.Map;
@@ -15,9 +18,13 @@ import java.util.Map;
  */
 @Component
 public class GameManager {
+  private static final Logger logger = LoggerFactory.getLogger(GameManager.class);
 
   @Autowired
   private RoomService roomService;
+
+  @Autowired
+  private StringRedisTemplate redisTemplate;
 
   // 存储活跃的游戏房间 roomId -> ChessRoom
   private final Map<String, ChessRoom> activeRooms = new ConcurrentHashMap<>();
@@ -27,20 +34,57 @@ public class GameManager {
    */
   public ChessRoom getOrCreateGameRoom(String roomId) {
     return activeRooms.computeIfAbsent(roomId, id -> {
-      // 从数据库获取房间信息
-      Room room = roomService.getById(id);
-      if (room == null) {
+      try {
+        logger.info("Attempting to create game room for roomId: {}", roomId);
+
+        // 首先检查Redis中是否有该房间的等待信息
+        String redisKey = "room:waiting:" + roomId;
+        String redisValue = redisTemplate.opsForValue().get(redisKey);
+
+        if (redisValue != null) {
+          logger.info("Found room {} in Redis waiting list", roomId);
+          // 从数据库获取房间信息
+          Room room = roomService.getById(roomId);
+          if (room != null) {
+            logger.info("Found room {} in database: name={}, status={}, player1={}, player2={}",
+                roomId, room.getName(), room.getStatus(), room.getPlayer1Id(), room.getPlayer2Id());
+
+            // 创建象棋房间
+            ChessRoom chessRoom = new ChessRoom(room.getName());
+            chessRoom.setId(room.getId());
+            chessRoom.setStatus(room.getStatus());
+            chessRoom.setPlayer1Id(room.getPlayer1Id());
+            chessRoom.setPlayer2Id(room.getPlayer2Id());
+
+            logger.info("Successfully created ChessRoom for {}", roomId);
+            return chessRoom;
+          } else {
+            logger.warn("Room {} exists in Redis but not in database", roomId);
+          }
+        } else {
+          logger.warn("Room {} not found in Redis waiting list", roomId);
+
+          // 尝试直接从数据库查找（可能是已经开始的游戏）
+          Room room = roomService.getById(roomId);
+          if (room != null) {
+            logger.info("Found existing room {} in database: status={}", roomId, room.getStatus());
+
+            ChessRoom chessRoom = new ChessRoom(room.getName());
+            chessRoom.setId(room.getId());
+            chessRoom.setStatus(room.getStatus());
+            chessRoom.setPlayer1Id(room.getPlayer1Id());
+            chessRoom.setPlayer2Id(room.getPlayer2Id());
+
+            return chessRoom;
+          }
+        }
+
+        logger.error("Room {} not found in Redis or database", roomId);
+        return null;
+      } catch (Exception e) {
+        logger.error("Error creating game room for {}: {}", roomId, e.getMessage(), e);
         return null;
       }
-
-      // 创建象棋房间
-      ChessRoom chessRoom = new ChessRoom(room.getName());
-      chessRoom.setId(room.getId());
-      chessRoom.setStatus(room.getStatus());
-      chessRoom.setPlayer1Id(room.getPlayer1Id());
-      chessRoom.setPlayer2Id(room.getPlayer2Id());
-
-      return chessRoom;
     });
   }
 
@@ -49,24 +93,238 @@ public class GameManager {
    */
   public void removeRoom(String roomId) {
     activeRooms.remove(roomId);
+    logger.info("Removed room {} from active rooms", roomId);
   }
 
   /**
    * 玩家加入房间
    */
   public boolean joinRoom(String roomId, Long userId, String playerName) {
+    logger.info("User {} attempting to join room {}", userId, roomId);
+
     ChessRoom room = getOrCreateGameRoom(roomId);
     if (room == null) {
+      logger.error("Failed to get or create game room {}", roomId);
       return false;
     }
 
-    // 确保创建游戏状态
-    if (room.getGameState() == null) {
-      room.createNewGame();
+    // 检查用户是否有权限加入该房间
+    boolean canJoin = false;
+    if (room.getPlayer1Id() != null && room.getPlayer1Id().equals(userId)) {
+      canJoin = true;
+      logger.info("User {} is player1 of room {}", userId, roomId);
+    } else if (room.getPlayer2Id() != null && room.getPlayer2Id().equals(userId)) {
+      canJoin = true;
+      logger.info("User {} is player2 of room {}", userId, roomId);
+    } else {
+      logger.warn("User {} is not authorized to join room {} (player1: {}, player2: {})",
+          userId, roomId, room.getPlayer1Id(), room.getPlayer2Id());
+      return false;
     }
 
-    // 加入玩家
-    return room.joinPlayer(userId, playerName, PlayerType.HUMAN);
+    if (canJoin) {
+      // 确保创建游戏状态
+      if (room.getGameState() == null) {
+        logger.info("Creating new game state for room {}", roomId);
+        try {
+          room.createNewGame();
+          // 验证游戏状态是否创建成功
+          if (room.getGameState() == null) {
+            logger.error(
+                "Failed to create game state for room {} - createNewGame() did not initialize gameState, trying manual creation",
+                roomId);
+
+            // 直接创建游戏状态并强制设置
+            try {
+              logger.info("Attempting to manually create and set game state for room {}", roomId);
+
+              // 直接使用正确的构造函数创建游戏状态
+              ChessGameState gameState = new ChessGameState(
+                  java.util.UUID.randomUUID().toString(), // gameId
+                  roomId // roomId
+              );
+
+              // 设置游戏状态为等待状态
+              gameState.setStatus(GameStatus.WAITING);
+
+              // 使用反射获取ChessRoom的gameState字段并设置
+              java.lang.reflect.Field gameStateField = ChessRoom.class.getDeclaredField("gameState");
+              gameStateField.setAccessible(true);
+              gameStateField.set(room, gameState);
+
+              logger.info("Successfully set game state manually for room {} with status {}",
+                  roomId, gameState.getStatus());
+
+              // 验证设置是否成功
+              if (room.getGameState() != null) {
+                logger.info("Game state verification successful - room.getGameState() is not null");
+              } else {
+                logger.error("Game state verification failed - room.getGameState() is still null after manual setting");
+                return false;
+              }
+
+            } catch (NoSuchFieldException e) {
+              logger.error("ChessRoom class does not have 'gameState' field: {}", e.getMessage());
+              return false;
+            } catch (IllegalAccessException e) {
+              logger.error("Cannot access 'gameState' field in ChessRoom: {}", e.getMessage());
+              return false;
+            } catch (Exception manualEx) {
+              logger.error("Manual game state creation failed for room {}: {}", roomId, manualEx.getMessage(),
+                  manualEx);
+              return false;
+            }
+          } else {
+            logger.info("Game state created successfully for room {}", roomId);
+          }
+        } catch (Exception e) {
+          logger.error("Exception while creating new game for room {}: {}", roomId, e.getMessage(), e);
+          return false;
+        }
+      }
+
+      // 添加详细的调试信息
+      logger.info("About to call room.joinPlayer() for user {} in room {} with name {} and type HUMAN",
+          userId, roomId, playerName);
+
+      // 检查游戏状态
+      ChessGameState gameState = room.getGameState();
+      if (gameState != null) {
+        logger.info("Game state exists - Red player: {}, Black player: {}, Status: {}",
+            gameState.getRedPlayer() != null ? gameState.getRedPlayer().getUserId() : "null",
+            gameState.getBlackPlayer() != null ? gameState.getBlackPlayer().getUserId() : "null",
+            gameState.getStatus());
+      } else {
+        logger.error("Game state is still null for room {} after all creation attempts", roomId);
+        return false;
+      }
+
+      // 加入玩家
+      try {
+        boolean joined = room.joinPlayer(userId, playerName, PlayerType.HUMAN);
+        logger.info("User {} join result for room {}: {}", userId, roomId, joined);
+
+        if (!joined) {
+          // 获取更多失败信息
+          logger.error("room.joinPlayer() failed for user {} in room {}. Room details:", userId, roomId);
+          logger.error("  - Room player1Id: {}", room.getPlayer1Id());
+          logger.error("  - Room player2Id: {}", room.getPlayer2Id());
+          logger.error("  - Room status: {}", room.getStatus());
+
+          // 重新获取游戏状态以确保最新信息
+          ChessGameState currentGameState = room.getGameState();
+          if (currentGameState != null) {
+            logger.error("  - GameState red player: {}",
+                currentGameState.getRedPlayer() != null
+                    ? currentGameState.getRedPlayer().getUserId() + "(" + currentGameState.getRedPlayer().getName()
+                        + ")"
+                    : "null");
+            logger.error("  - GameState black player: {}",
+                currentGameState.getBlackPlayer() != null
+                    ? currentGameState.getBlackPlayer().getUserId() + "(" + currentGameState.getBlackPlayer().getName()
+                        + ")"
+                    : "null");
+            logger.error("  - GameState status: {}", currentGameState.getStatus());
+
+            // 尝试手动添加玩家到游戏状态
+            try {
+              logger.info("Attempting to manually add player to game state for room {}", roomId);
+
+              // 确定玩家颜色并创建Player对象
+              Player player = null;
+              if (room.getPlayer1Id() != null && room.getPlayer1Id().equals(userId)) {
+                // 当前用户是player1，设置为红方
+                if (currentGameState.getRedPlayer() == null) {
+                  player = new Player(userId, playerName, PlayerType.HUMAN, PlayerColor.RED);
+                  currentGameState.setRedPlayer(player);
+                  logger.info("Manually set user {} as red player in room {}", userId, roomId);
+                  joined = true;
+                }
+              } else if (room.getPlayer2Id() != null && room.getPlayer2Id().equals(userId)) {
+                // 当前用户是player2，设置为黑方
+                if (currentGameState.getBlackPlayer() == null) {
+                  player = new Player(userId, playerName, PlayerType.HUMAN, PlayerColor.BLACK);
+                  currentGameState.setBlackPlayer(player);
+                  logger.info("Manually set user {} as black player in room {}", userId, roomId);
+                  joined = true;
+                }
+              }
+
+              if (joined) {
+                logger.info("Successfully manually added player {} to game state in room {}", userId, roomId);
+              }
+            } catch (Exception manualPlayerEx) {
+              logger.error("Failed to manually add player to game state for room {}: {}",
+                  roomId, manualPlayerEx.getMessage(), manualPlayerEx);
+            }
+          } else {
+            logger.error("  - GameState is null");
+          }
+        }
+
+        if (joined) {
+          // 成功加入后记录最终状态
+          ChessGameState finalGameState = room.getGameState();
+          if (finalGameState != null) {
+            logger.info("Successfully joined room {}. Final state - Red: {}, Black: {}",
+                roomId,
+                finalGameState.getRedPlayer() != null ? finalGameState.getRedPlayer().getUserId() : "null",
+                finalGameState.getBlackPlayer() != null ? finalGameState.getBlackPlayer().getUserId() : "null");
+          }
+        }
+
+        return joined;
+      } catch (Exception e) {
+        logger.error("Exception in room.joinPlayer() for user {} in room {}: {}", userId, roomId, e.getMessage(), e);
+        return false;
+      }
+    }
+
+    return false;
+  }
+
+  /**
+   * 使用反射创建游戏状态
+   */
+  private ChessGameState createGameStateWithReflection() {
+    try {
+      // 尝试不同的构造方法
+      Class<ChessGameState> clazz = ChessGameState.class;
+
+      // 首先尝试查找可用的构造函数
+      java.lang.reflect.Constructor<?>[] constructors = clazz.getDeclaredConstructors();
+      logger.info("Available ChessGameState constructors:");
+      for (java.lang.reflect.Constructor<?> constructor : constructors) {
+        logger.info("  - Constructor with {} parameters: {}",
+            constructor.getParameterCount(),
+            java.util.Arrays.toString(constructor.getParameterTypes()));
+      }
+
+      // 尝试找到(String, String)构造函数
+      for (java.lang.reflect.Constructor<?> constructor : constructors) {
+        Class<?>[] paramTypes = constructor.getParameterTypes();
+        if (paramTypes.length == 2 &&
+            paramTypes[0] == String.class &&
+            paramTypes[1] == String.class) {
+
+          constructor.setAccessible(true);
+
+          // 创建游戏状态，使用随机gameId和roomId
+          String gameId = java.util.UUID.randomUUID().toString();
+          String roomId = java.util.UUID.randomUUID().toString();
+
+          ChessGameState gameState = (ChessGameState) constructor.newInstance(gameId, roomId);
+          logger.info("Successfully created ChessGameState using (String, String) constructor");
+          return gameState;
+        }
+      }
+
+      logger.error("No suitable constructor found for ChessGameState");
+      return null;
+    } catch (Exception e) {
+      logger.error("Failed to create ChessGameState using reflection: {}", e.getMessage(), e);
+      return null;
+    }
   }
 
   /**

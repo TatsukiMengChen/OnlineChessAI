@@ -28,6 +28,8 @@ public class AuthServiceImpl implements AuthService {
   private JavaMailSender mailSender;
   @Autowired
   private PasswordEncoder passwordEncoder;
+  @Autowired
+  private JwtUtil jwtUtil; // 添加JwtUtil注入
 
   @Value("${spring.mail.username}")
   private String mailUsername;
@@ -67,7 +69,7 @@ public class AuthServiceImpl implements AuthService {
     redisTemplate.delete("email:code:" + email);
 
     // 生成JWT token
-    String token = JwtUtil.generateToken(String.valueOf(user.getId()), user.getEmail());
+    String token = jwtUtil.generateToken(String.valueOf(user.getId()), user.getEmail());
     AuthRes authRes = new AuthRes(token, new AuthRes.UserInfo(user));
 
     return ServiceResult.success("注册成功", authRes);
@@ -84,7 +86,7 @@ public class AuthServiceImpl implements AuthService {
     }
 
     // 登录成功，生成JWT
-    String token = JwtUtil.generateToken(String.valueOf(user.getId()), user.getEmail());
+    String token = jwtUtil.generateToken(String.valueOf(user.getId()), user.getEmail());
     AuthRes authRes = new AuthRes(token, new AuthRes.UserInfo(user));
 
     return ServiceResult.success("登录成功", authRes);

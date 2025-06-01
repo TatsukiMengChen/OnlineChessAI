@@ -28,21 +28,30 @@ public class RoomSocketServer implements InitializingBean {
   @Autowired
   private com.mimeng.chess.service.UserService userService;
 
+  @Autowired
+  private JwtUtil jwtUtil;
+
   // 存储客户端信息 clientId -> userInfo
   private final Map<String, UserInfo> clientUsers = new ConcurrentHashMap<>();
   // 存储房间中的客户端 roomId -> Set<clientId>
   private final Map<String, Map<String, SocketIOClient>> roomClients = new ConcurrentHashMap<>();
+  // 防重复认证 - 存储正在认证的客户端
+  private final Map<String, Boolean> authenticatingClients = new ConcurrentHashMap<>();
+  // 存储已认证的客户端
+  private final Map<String, Boolean> authenticatedClients = new ConcurrentHashMap<>();
 
   // 用户信息类
   private static class UserInfo {
     Long userId;
     String userName;
     String roomId;
+    boolean isAuthenticated;
 
     UserInfo(Long userId, String userName, String roomId) {
       this.userId = userId;
       this.userName = userName;
       this.roomId = roomId;
+      this.isAuthenticated = false;
     }
   }
 
@@ -53,133 +62,235 @@ public class RoomSocketServer implements InitializingBean {
       @Override
       public void onConnect(SocketIOClient client) {
         String roomId = client.getHandshakeData().getSingleUrlParam("id");
-        logger.info("Client {} connected to room {}", client.getSessionId(), roomId);
+        String clientId = client.getSessionId().toString();
+
+        logger.info("Client {} connected to room {}", clientId, roomId);
 
         if (roomId == null) {
+          logger.warn("Client {} connected without roomId, disconnecting", clientId);
           client.disconnect();
           return;
         }
-        logger.info("Client {} is trying to authenticate in room {}", client.getSessionId(), roomId);
+
+        // 检查是否已经有相同用户的连接
+        logger.info("Client {} is trying to authenticate in room {}", clientId, roomId);
         client.sendEvent("need_auth", "请发送token进行鉴权");
       }
     });
 
-    // 鉴权事件 - 修复的核心部分
+    // 鉴权事件 - 添加防重复认证
     socketIOServer.addEventListener("auth", Object.class, (client, data, ackSender) -> {
+      String clientId = client.getSessionId().toString();
+
       try {
-        String token = null;
-
-        // 调试日志：打印接收到的数据类型和内容
-        logger.debug("Auth data received - Type: {}, Content: {}",
-            data != null ? data.getClass().getSimpleName() : "null", data);
-
-        // 处理不同格式的token数据
-        if (data instanceof String) {
-          String dataStr = (String) data;
-          // 检查是否是JSON格式的字符串
-          if (dataStr.trim().startsWith("{") && dataStr.trim().endsWith("}")) {
-            // 尝试手动解析JSON字符串
-            try {
-              // 简单的JSON解析，查找token字段
-              String tokenPattern = "\"token\"\\s*:\\s*\"([^\"]+)\"";
-              java.util.regex.Pattern pattern = java.util.regex.Pattern.compile(tokenPattern);
-              java.util.regex.Matcher matcher = pattern.matcher(dataStr);
-              if (matcher.find()) {
-                token = matcher.group(1);
-                logger.debug("Extracted token from JSON string: {}",
-                    token.substring(0, Math.min(20, token.length())) + "...");
-              }
-            } catch (Exception jsonEx) {
-              logger.warn("Failed to parse JSON string: {}", jsonEx.getMessage());
-            }
-          } else {
-            // 直接作为token使用
-            token = dataStr;
-          }
-        } else if (data instanceof Map) {
-          @SuppressWarnings("unchecked")
-          Map<String, Object> map = (Map<String, Object>) data;
-          Object tokenObj = map.get("token");
-          if (tokenObj instanceof String) {
-            token = (String) tokenObj;
-            logger.debug("Extracted token from Map: {}", token.substring(0, Math.min(20, token.length())) + "...");
-          }
+        // 检查是否已经认证
+        if (authenticatedClients.containsKey(clientId)) {
+          logger.warn("Client {} already authenticated, ignoring duplicate auth request", clientId);
+          client.sendEvent("auth_success", "已认证");
+          return;
         }
 
-        if (token == null || token.trim().isEmpty()) {
-          logger.warn("Client {} attempted auth without valid token", client.getSessionId());
-          client.sendEvent("auth_fail", "token缺失或无效");
-          client.disconnect();
+        // 检查是否正在认证
+        if (authenticatingClients.putIfAbsent(clientId, true) != null) {
+          logger.warn("Client {} is already authenticating, ignoring duplicate auth request", clientId);
           return;
-        } // 解析JWT token
-        Claims claims;
+        }
+
         try {
-          logger.debug("Attempting to parse JWT token: {}", token.substring(0, Math.min(20, token.length())) + "...");
-          claims = JwtUtil.parseToken(token);
-          logger.debug("JWT token parsed successfully");
-        } catch (Exception e) {
-          logger.error("Failed to parse JWT token: {}", e.getMessage(), e);
-          client.sendEvent("auth_fail", "token解析失败: " + e.getMessage());
-          client.disconnect();
-          return;
-        }
+          String token = null;
 
-        String userIdStr = claims.get("userId", String.class);
-        String email = claims.get("email", String.class);
-        String roomId = client.getHandshakeData().getSingleUrlParam("id");
+          // 调试日志：打印接收到的数据类型和内容
+          logger.info("Auth data received from client {} - Type: {}, Content: {}",
+              clientId,
+              data != null ? data.getClass().getSimpleName() : "null", data);
 
-        logger.debug("Extracted from token - userId: {}, email: {}, roomId: {}", userIdStr, email, roomId);
+          // 处理不同格式的token数据
+          if (data instanceof String) {
+            String dataStr = (String) data;
+            // 检查是否是JSON格式的字符串
+            if (dataStr.trim().startsWith("{") && dataStr.trim().endsWith("}")) {
+              // 尝试手动解析JSON字符串
+              try {
+                // 简单的JSON解析，查找token字段
+                String tokenPattern = "\"token\"\\s*:\\s*\"([^\"]+)\"";
+                java.util.regex.Pattern pattern = java.util.regex.Pattern.compile(tokenPattern);
+                java.util.regex.Matcher matcher = pattern.matcher(dataStr);
+                if (matcher.find()) {
+                  token = matcher.group(1);
+                  logger.info("Extracted token from JSON string: {}...",
+                      token.substring(0, Math.min(20, token.length())));
+                }
+              } catch (Exception jsonEx) {
+                logger.warn("Failed to parse JSON string: {}", jsonEx.getMessage());
+              }
+            } else {
+              // 直接作为token使用
+              token = dataStr;
+              logger.info("Using data directly as token: {}...",
+                  token.substring(0, Math.min(20, token.length())));
+            }
+          } else if (data instanceof Map) {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> map = (Map<String, Object>) data;
+            Object tokenObj = map.get("token");
+            if (tokenObj instanceof String) {
+              token = (String) tokenObj;
+              logger.info("Extracted token from Map: {}...",
+                  token.substring(0, Math.min(20, token.length())));
+            }
+          }
 
-        if (userIdStr == null || email == null) {
-          logger.warn("Client {} auth with missing userId or email in token", client.getSessionId());
-          client.sendEvent("auth_fail", "token中缺少必要信息");
-          client.disconnect();
-          return;
-        }
+          if (token == null || token.trim().isEmpty()) {
+            logger.warn("Client {} attempted auth without valid token", clientId);
+            client.sendEvent("auth_fail", "token缺失或无效");
+            client.disconnect();
+            return;
+          }
 
-        Long userId = Long.valueOf(userIdStr);
-        // 从email中提取用户名作为显示名称
-        String userName = email.split("@")[0];
+          // 解析JWT token
+          Claims claims;
+          try {
+            logger.info("Attempting to parse JWT token for client {}: {}...",
+                clientId, token.substring(0, Math.min(20, token.length())));
+            claims = jwtUtil.parseToken(token);
+            logger.info("JWT token parsed successfully for client {}", clientId);
+          } catch (Exception e) {
+            logger.error("Failed to parse JWT token for client {}: {}",
+                clientId, e.getMessage(), e);
+            client.sendEvent("auth_fail", "token解析失败: " + e.getMessage());
+            client.disconnect();
+            return;
+          }
 
-        if (userId == null || userName == null || roomId == null) {
-          logger.warn("Client {} auth with incomplete data: userId={}, userName={}, roomId={}",
-              client.getSessionId(), userId, userName, roomId);
-          client.sendEvent("auth_fail", "认证信息不完整");
-          client.disconnect();
-          return;
-        }
+          String userIdStr = claims.get("userId", String.class);
+          String email = claims.get("email", String.class);
+          String roomId = client.getHandshakeData().getSingleUrlParam("id");
 
-        // 保存用户信息
-        UserInfo userInfo = new UserInfo(userId, userName, roomId);
-        clientUsers.put(client.getSessionId().toString(), userInfo);
+          logger.info("Extracted from token for client {} - userId: {}, email: {}, roomId: {}",
+              clientId, userIdStr, email, roomId);
 
-        // 加入房间
-        client.joinRoom(roomId);
-        roomClients.computeIfAbsent(roomId, k -> new ConcurrentHashMap<>())
-            .put(client.getSessionId().toString(), client);
+          if (userIdStr == null || email == null) {
+            logger.warn("Client {} auth with missing userId or email in token", clientId);
+            client.sendEvent("auth_fail", "token中缺少必要信息");
+            client.disconnect();
+            return;
+          }
 
-        // 加入游戏房间
-        boolean joined = gameManager.joinRoom(roomId, userId, userName);
-        if (joined) {
-          logger.info("User {} ({}) successfully authenticated and joined room {}", userName, userId, roomId);
-          client.sendEvent("auth_success", "鉴权成功");
+          Long userId;
+          try {
+            userId = Long.valueOf(userIdStr);
+          } catch (NumberFormatException e) {
+            logger.warn("Client {} auth with invalid userId format: {}", clientId, userIdStr);
+            client.sendEvent("auth_fail", "用户ID格式无效");
+            client.disconnect();
+            return;
+          }
 
-          // 广播玩家加入
-          broadcastToRoom(roomId, "player_joined", Map.of(
-              "userId", userId,
-              "userName", userName));
+          // 检查是否有相同用户的其他连接
+          for (Map.Entry<String, UserInfo> entry : clientUsers.entrySet()) {
+            UserInfo existingUser = entry.getValue();
+            if (existingUser.userId.equals(userId) && existingUser.roomId.equals(roomId)) {
+              logger.warn("User {} already has an active connection {} in room {}, disconnecting new connection {}",
+                  userId, entry.getKey(), roomId, clientId);
+              client.sendEvent("auth_fail", "该用户已在房间中");
+              client.disconnect();
+              return;
+            }
+          }
 
-          // 发送当前游戏状态
-          sendGameState(roomId);
-        } else {
-          logger.warn("User {} ({}) failed to join room {}", userName, userId, roomId);
-          client.sendEvent("auth_fail", "加入房间失败");
-          client.disconnect();
+          // 从email中提取用户名作为显示名称
+          String userName = email.split("@")[0];
+
+          if (userName == null || roomId == null) {
+            logger.warn("Client {} auth with incomplete data: userId={}, userName={}, roomId={}",
+                clientId, userId, userName, roomId);
+            client.sendEvent("auth_fail", "认证信息不完整");
+            client.disconnect();
+            return;
+          }
+
+          // 保存用户信息
+          UserInfo userInfo = new UserInfo(userId, userName, roomId);
+          clientUsers.put(clientId, userInfo);
+
+          // 加入房间
+          client.joinRoom(roomId);
+          roomClients.computeIfAbsent(roomId, k -> new ConcurrentHashMap<>())
+              .put(clientId, client);
+
+          // 加入游戏房间
+          logger.info("Attempting to join game room - roomId: {}, userId: {}, userName: {}",
+              roomId, userId, userName);
+
+          boolean joined = gameManager.joinRoom(roomId, userId, userName);
+          logger.info("GameManager.joinRoom result for user {} in room {}: {}",
+              userId, roomId, joined);
+
+          if (joined) {
+            // 标记为已认证
+            userInfo.isAuthenticated = true;
+            authenticatedClients.put(clientId, true);
+
+            logger.info("User {} ({}) successfully authenticated and joined room {}", userName, userId, roomId);
+            client.sendEvent("auth_success", "鉴权成功");
+
+            // 广播玩家加入
+            broadcastToRoom(roomId, "player_joined", Map.of(
+                "userId", userId,
+                "userName", userName));
+
+            // 发送当前游戏状态
+            sendGameState(roomId);
+
+            // 额外发送一次房间状态确保前端收到
+            sendRoomStatus(roomId);
+          } else {
+            logger.error("User {} ({}) failed to join room {} - GameManager.joinRoom returned false",
+                userName, userId, roomId);
+
+            // 清理已保存的信息
+            clientUsers.remove(clientId);
+            Map<String, SocketIOClient> roomClientMap = roomClients.get(roomId);
+            if (roomClientMap != null) {
+              roomClientMap.remove(clientId);
+            }
+
+            client.sendEvent("auth_fail", "房间已满或其他原因导致加入失败");
+            client.disconnect();
+          }
+        } finally {
+          // 移除认证状态
+          authenticatingClients.remove(clientId);
         }
       } catch (Exception e) {
-        logger.error("Auth error for client {}: {}", client.getSessionId(), e.getMessage(), e);
-        client.sendEvent("auth_fail", "token无效");
+        logger.error("Auth error for client {}: {}", clientId, e.getMessage(), e);
+        authenticatingClients.remove(clientId);
+        client.sendEvent("auth_fail", "认证处理异常: " + e.getMessage());
         client.disconnect();
+      }
+    });
+
+    // 获取房间状态事件
+    socketIOServer.addEventListener("get_room_state", Object.class, (client, data, ackSender) -> {
+      try {
+        String clientId = client.getSessionId().toString();
+        UserInfo userInfo = clientUsers.get(clientId);
+
+        if (userInfo == null || !userInfo.isAuthenticated) {
+          logger.warn("Unauthenticated client {} requested room state", clientId);
+          client.sendEvent("auth_fail", "未认证的连接");
+          return;
+        }
+
+        logger.info("Client {} requested room state for room {}", clientId, userInfo.roomId);
+
+        // 发送游戏状态给单个客户端
+        sendGameStateToClient(client, userInfo.roomId);
+        sendRoomStatusToClient(client, userInfo.roomId);
+
+      } catch (Exception e) {
+        logger.error("Error handling get_room_state: {}", e.getMessage(), e);
+        client.sendEvent("error", "获取房间状态时发生错误");
       }
     });
 
@@ -416,6 +527,10 @@ public class RoomSocketServer implements InitializingBean {
           String clientId = client.getSessionId().toString();
           UserInfo userInfo = clientUsers.remove(clientId);
 
+          // 清理认证状态
+          authenticatingClients.remove(clientId);
+          authenticatedClients.remove(clientId);
+
           if (userInfo != null) {
             logger.info("User {} ({}) disconnected from room {}", userInfo.userName, userInfo.userId, userInfo.roomId);
 
@@ -429,13 +544,15 @@ public class RoomSocketServer implements InitializingBean {
               }
             }
 
-            // 玩家离开游戏
-            gameManager.leaveRoom(userInfo.roomId, userInfo.userId);
+            // 只有已认证的用户才需要离开游戏房间
+            if (userInfo.isAuthenticated) {
+              gameManager.leaveRoom(userInfo.roomId, userInfo.userId);
 
-            // 广播玩家离开
-            broadcastToRoom(userInfo.roomId, "player_left", Map.of(
-                "userId", userInfo.userId,
-                "userName", userInfo.userName));
+              // 广播玩家离开
+              broadcastToRoom(userInfo.roomId, "player_left", Map.of(
+                  "userId", userInfo.userId,
+                  "userName", userInfo.userName));
+            }
           } else {
             logger.debug("Unknown client {} disconnected", clientId);
           }
@@ -461,9 +578,84 @@ public class RoomSocketServer implements InitializingBean {
   }
 
   /**
+   * 发送房间状态给房间内所有客户端
+   */
+  private void sendRoomStatus(String roomId) {
+    Map<String, SocketIOClient> clients = roomClients.get(roomId);
+    if (clients != null) {
+      for (SocketIOClient client : clients.values()) {
+        sendRoomStatusToClient(client, roomId);
+      }
+    }
+  }
+
+  /**
+   * 发送房间状态给指定客户端
+   */
+  private void sendRoomStatusToClient(SocketIOClient client, String roomId) {
+    try {
+      ChessGameState gameState = gameManager.getGameState(roomId);
+      if (gameState == null) {
+        logger.warn("No game state found for room {}", roomId);
+        client.sendEvent("room_status", Map.of(
+            "status", "waiting",
+            "message", "等待游戏状态初始化"));
+        return;
+      }
+
+      Map<String, Object> roomStatus = new HashMap<>();
+      roomStatus.put("status", gameState.getStatus().toString());
+      roomStatus.put("message", gameState.getGameStatusSummary());
+
+      // 玩家状态信息
+      Map<String, Object> players = new HashMap<>();
+      if (gameState.getRedPlayer() != null) {
+        Player redPlayer = gameState.getRedPlayer();
+        players.put("red", Map.of(
+            "userId", redPlayer.getUserId(),
+            "name", redPlayer.getName(),
+            "ready", redPlayer.isReady(),
+            "online", redPlayer.isOnline(),
+            "color", "RED"));
+      }
+
+      if (gameState.getBlackPlayer() != null) {
+        Player blackPlayer = gameState.getBlackPlayer();
+        players.put("black", Map.of(
+            "userId", blackPlayer.getUserId(),
+            "name", blackPlayer.getName(),
+            "ready", blackPlayer.isReady(),
+            "online", blackPlayer.isOnline(),
+            "color", "BLACK"));
+      }
+
+      roomStatus.put("players", players);
+      roomStatus.put("waitingForPlayers", gameState.getRedPlayer() == null || gameState.getBlackPlayer() == null);
+
+      client.sendEvent("room_status", roomStatus);
+      logger.debug("Room status sent to client in room {}", roomId);
+
+    } catch (Exception e) {
+      logger.error("Error sending room status to client in room {}: {}", roomId, e.getMessage(), e);
+    }
+  }
+
+  /**
    * 发送游戏状态给房间内所有客户端
    */
   private void sendGameState(String roomId) {
+    Map<String, SocketIOClient> clients = roomClients.get(roomId);
+    if (clients != null) {
+      for (SocketIOClient client : clients.values()) {
+        sendGameStateToClient(client, roomId);
+      }
+    }
+  }
+
+  /**
+   * 发送游戏状态给指定客户端
+   */
+  private void sendGameStateToClient(SocketIOClient client, String roomId) {
     try {
       ChessGameState gameState = gameManager.getGameState(roomId);
       if (gameState == null) {
@@ -480,14 +672,18 @@ public class RoomSocketServer implements InitializingBean {
         stateData.put("redPlayer", Map.of(
             "userId", gameState.getRedPlayer().getUserId(),
             "name", gameState.getRedPlayer().getName(),
-            "ready", gameState.getRedPlayer().isReady()));
+            "ready", gameState.getRedPlayer().isReady(),
+            "online", gameState.getRedPlayer().isOnline(),
+            "color", "RED"));
       }
 
       if (gameState.getBlackPlayer() != null) {
         stateData.put("blackPlayer", Map.of(
             "userId", gameState.getBlackPlayer().getUserId(),
             "name", gameState.getBlackPlayer().getName(),
-            "ready", gameState.getBlackPlayer().isReady()));
+            "ready", gameState.getBlackPlayer().isReady(),
+            "online", gameState.getBlackPlayer().isOnline(),
+            "color", "BLACK"));
       }
 
       // 棋盘状态
@@ -496,11 +692,11 @@ public class RoomSocketServer implements InitializingBean {
         stateData.put("boardState", serializeBoardState(board));
       }
 
-      broadcastToRoom(roomId, "game_state", stateData);
-      logger.debug("Game state sent to room {}", roomId);
+      client.sendEvent("game_state", stateData);
+      logger.debug("Game state sent to client in room {}", roomId);
 
     } catch (Exception e) {
-      logger.error("Error sending game state to room {}: {}", roomId, e.getMessage(), e);
+      logger.error("Error sending game state to client in room {}: {}", roomId, e.getMessage(), e);
     }
   }
 

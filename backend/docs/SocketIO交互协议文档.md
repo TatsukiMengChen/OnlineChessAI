@@ -2,117 +2,127 @@
 
 ## 概述
 
-本文档定义了中国象棋对战平台前后端之间基于Socket.IO的实时通信协议。**该协议与现有HTTP REST API协调工作**：
-- **HTTP API**负责房间的CRUD操作（创建、列表、加入、退出、关闭）
+本文档定义了中国象棋对战平台前后端之间基于 Socket.IO 的实时通信协议。**该协议与现有 HTTP REST API 协调工作**：
+
+- **HTTP API**负责房间的 CRUD 操作（创建、列表、加入、退出、关闭）
 - **Socket.IO**负责实时游戏逻辑和状态同步
 
 ## 架构设计
 
-### API分工
-| 功能模块 | HTTP REST API | Socket.IO |
-|---------|-------------|-----------|
-| 房间管理 | ✅ 创建、列表、加入、退出、关闭 | ❌ |
-| 用户认证 | ✅ 登录、注册、JWT验证 | ✅ Socket连接认证 |
-| 游戏逻辑 | ❌ | ✅ 移动、选择、状态同步 |
-| 实时通信 | ❌ | ✅ 聊天、观战、事件广播 |
+### API 分工
+
+| 功能模块 | HTTP REST API                   | Socket.IO               |
+| -------- | ------------------------------- | ----------------------- |
+| 房间管理 | ✅ 创建、列表、加入、退出、关闭 | ❌                      |
+| 用户认证 | ✅ 登录、注册、JWT 验证         | ✅ Socket 连接认证      |
+| 游戏逻辑 | ❌                              | ✅ 移动、选择、状态同步 |
+| 实时通信 | ❌                              | ✅ 聊天、观战、事件广播 |
 
 ### 工作流程
-1. **进入房间前**：用户通过HTTP API获取房间列表、创建房间、加入房间
-2. **进入房间后**：用户通过Socket.IO连接到房间，进行游戏交互
-3. **离开房间**：用户可通过HTTP API或Socket.IO断开离开
+
+1. **进入房间前**：用户通过 HTTP API 获取房间列表、创建房间、加入房间
+2. **进入房间后**：用户通过 Socket.IO 连接到房间，进行游戏交互
+3. **离开房间**：用户可通过 HTTP API 或 Socket.IO 断开离开
 
 ## 连接流程
 
 ### 1. 建立连接
 
-**客户端连接URL：**
+**客户端连接 URL：**
+
 ```
-ws://localhost:8080/socket.io/?roomId={roomId}&token={jwtToken}
+ws://localhost:8080/socket.io/?roomId={roomId}
 ```
 
 **参数说明：**
-- `roomId`: 房间ID（必须，通过HTTP API获取）
-- `token`: JWT认证令牌（必须，从登录获取）
+
+- `roomId`: 房间 ID（必须，通过 HTTP API 获取）
 
 ### 2. 认证流程
 
 #### 服务端 → 客户端
+
 ```javascript
 // 连接成功后，服务端要求认证
-socket.emit('need_auth', '请发送token进行鉴权');
+socket.emit("need_auth", "请发送token进行鉴权");
 ```
 
 #### 客户端 → 服务端
+
 ```javascript
 // 客户端发送认证信息
-socket.emit('auth', {
-    token: 'jwt_token_here'
+socket.emit("auth", {
+  token: "jwt_token_here",
 });
 ```
 
 #### 服务端 → 客户端
+
 ```javascript
 // 认证成功，返回房间信息
-socket.emit('auth_success', {
-    message: '鉴权成功',
-    userInfo: {
-        userId: 'user123',
-        username: '玩家名称',
-        avatar: 'avatar_url'
+socket.emit("auth_success", {
+  message: "鉴权成功",
+  userInfo: {
+    userId: "user123",
+    username: "玩家名称",
+    avatar: "avatar_url",
+  },
+  roomInfo: {
+    id: "room_123",
+    name: "我的象棋房间",
+    status: "waiting", // waiting, full, playing, finished
+    player1Id: "user123",
+    player2Id: "user456",
+    createdAt: "2025-06-01T10:00:00Z",
+    // 扩展游戏信息
+    gameState: null, // 如果游戏未开始
+    spectators: ["user789"],
+    settings: {
+      timeLimit: 600,
+      allowUndo: true,
     },
-    roomInfo: {
-        id: 'room_123',
-        name: '我的象棋房间',
-        status: 'waiting', // waiting, full, playing, finished
-        player1Id: 'user123',
-        player2Id: 'user456',
-        createdAt: '2025-06-01T10:00:00Z',
-        // 扩展游戏信息
-        gameState: null, // 如果游戏未开始
-        spectators: ['user789'],
-        settings: {
-            timeLimit: 600,
-            allowUndo: true
-        }
-    }
+  },
 });
 
 // 认证失败
-socket.emit('auth_fail', {
-    message: 'token无效',
-    code: 'INVALID_TOKEN'
+socket.emit("auth_fail", {
+  message: "token无效",
+  code: "INVALID_TOKEN",
 });
 ```
 
 ## 房间状态管理
 
-> **注意：房间的创建、加入、退出等操作通过HTTP API完成，Socket.IO主要负责房间内的实时状态同步**
+> **注意：房间的创建、加入、退出等操作通过 HTTP API 完成，Socket.IO 主要负责房间内的实时状态同步**
 
-### 1. 进入房间（Socket连接后）
+### 1. 进入房间（Socket 连接后）
 
-当用户通过Socket.IO连接到已加入的房间后：
+当用户通过 Socket.IO 连接到已加入的房间后：
 
 #### 服务端 → 房间内所有用户
+
 ```javascript
 // 广播用户进入房间
-socket.broadcast.to(roomId).emit('user_entered_room', {
-    user: {
-        userId: 'user456',
-        username: '玩家2',
-        avatar: 'avatar_url'
-    },
-    enterTime: '2025-06-01T10:05:00Z'
+socket.broadcast.to(roomId).emit("user_entered_room", {
+  user: {
+    userId: "user456",
+    username: "玩家2",
+    avatar: "avatar_url",
+  },
+  enterTime: "2025-06-01T10:05:00Z",
 });
 ```
 
 ### 2. 房间状态同步
 
 #### 客户端请求房间完整状态
+
 ```javascript
-socket.emit('get_room_state');
+socket.emit("get_room_state");
 ```
 
 #### 服务端响应
+
 ```javascript
 socket.emit('room_state', {
     roomInfo: {
@@ -127,7 +137,7 @@ socket.emit('room_state', {
             isOnline: true
         },
         player2: {
-            userId: 'user456', 
+            userId: 'user456',
             username: '玩家2',
             color: 'BLACK',
             isReady: true,
@@ -157,19 +167,21 @@ socket.emit('room_state', {
 ### 3. 离开房间
 
 #### 客户端 → 服务端
+
 ```javascript
 // 主动离开房间（也可能是断线）
-socket.emit('leave_room');
+socket.emit("leave_room");
 ```
 
 #### 服务端 → 房间内其他用户
+
 ```javascript
 // 广播用户离开
-socket.broadcast.to(roomId).emit('user_left_room', {
-    userId: 'user456',
-    username: '玩家2',
-    reason: 'LEAVE', // LEAVE, DISCONNECT, KICKED
-    leaveTime: '2025-06-01T10:15:00Z'
+socket.broadcast.to(roomId).emit("user_left_room", {
+  userId: "user456",
+  username: "玩家2",
+  reason: "LEAVE", // LEAVE, DISCONNECT, KICKED
+  leaveTime: "2025-06-01T10:15:00Z",
 });
 ```
 
@@ -178,187 +190,195 @@ socket.broadcast.to(roomId).emit('user_left_room', {
 ### 1. 游戏准备
 
 #### 客户端 → 服务端
+
 ```javascript
 // 玩家准备
-socket.emit('player_ready', {
-    ready: true
+socket.emit("player_ready", {
+  ready: true,
 });
 ```
 
 #### 服务端 → 房间内所有用户
+
 ```javascript
 // 玩家准备状态更新
-socket.emit('player_ready_changed', {
-    userId: 'user123',
-    username: '玩家1',
-    ready: true
+socket.emit("player_ready_changed", {
+  userId: "user123",
+  username: "玩家1",
+  ready: true,
 });
 
 // 游戏开始（当双方都准备好）
-socket.emit('game_started', {
-    gameState: {
-        gameId: 'game_123_456',
-        board: [
-            // 10x9 棋盘状态，null表示空位
-            [
-                {type: 'ROOK', color: 'BLACK', position: {row: 0, col: 0}},
-                {type: 'HORSE', color: 'BLACK', position: {row: 0, col: 1}},
-                // ... 完整棋盘布局
-            ]
-        ],
-        currentPlayer: 'RED', // 红方先走
-        gameStatus: 'PLAYING',
-        moveHistory: [],
-        timeRemaining: {
-            red: 600,
-            black: 600
-        },
-        lastMove: null,
-        checkStatus: {
-            inCheck: false,
-            checkedKing: null
-        }
+socket.emit("game_started", {
+  gameState: {
+    gameId: "game_123_456",
+    board: [
+      // 10x9 棋盘状态，null表示空位
+      [
+        { type: "ROOK", color: "BLACK", position: { row: 0, col: 0 } },
+        { type: "HORSE", color: "BLACK", position: { row: 0, col: 1 } },
+        // ... 完整棋盘布局
+      ],
+    ],
+    currentPlayer: "RED", // 红方先走
+    gameStatus: "PLAYING",
+    moveHistory: [],
+    timeRemaining: {
+      red: 600,
+      black: 600,
     },
-    startTime: '2025-06-01T10:05:00Z'
+    lastMove: null,
+    checkStatus: {
+      inCheck: false,
+      checkedKing: null,
+    },
+  },
+  startTime: "2025-06-01T10:05:00Z",
 });
 ```
 
 ### 2. 棋子移动
 
 #### 客户端 → 服务端
+
 ```javascript
 // 选择棋子
-socket.emit('select_piece', {
-    position: {row: 9, col: 4}
+socket.emit("select_piece", {
+  position: { row: 9, col: 4 },
 });
 
 // 移动棋子
-socket.emit('move_piece', {
-    from: {row: 9, col: 4},
-    to: {row: 8, col: 4}
+socket.emit("move_piece", {
+  from: { row: 9, col: 4 },
+  to: { row: 8, col: 4 },
 });
 ```
 
 #### 服务端 → 客户端
+
 ```javascript
 // 棋子选择响应
-socket.emit('piece_selected', {
-    position: {row: 9, col: 4},
-    piece: {
-        type: 'KING',
-        color: 'RED'
-    },
-    availableMoves: [
-        {row: 8, col: 4},
-        {row: 9, col: 3},
-        {row: 9, col: 5}
-    ]
+socket.emit("piece_selected", {
+  position: { row: 9, col: 4 },
+  piece: {
+    type: "KING",
+    color: "RED",
+  },
+  availableMoves: [
+    { row: 8, col: 4 },
+    { row: 9, col: 3 },
+    { row: 9, col: 5 },
+  ],
 });
 
 // 移动无效
-socket.emit('invalid_move', {
-    message: '无效移动',
-    code: 'INVALID_MOVE',
-    from: {row: 9, col: 4},
-    to: {row: 8, col: 4}
+socket.emit("invalid_move", {
+  message: "无效移动",
+  code: "INVALID_MOVE",
+  from: { row: 9, col: 4 },
+  to: { row: 8, col: 4 },
 });
 ```
 
 #### 服务端 → 房间内所有用户
+
 ```javascript
 // 移动成功广播
-socket.emit('move_made', {
-    move: {
-        from: {row: 9, col: 4},
-        to: {row: 8, col: 4},
-        piece: {type: 'KING', color: 'RED'},
-        capturedPiece: null,
-        moveType: 'NORMAL', // NORMAL, CAPTURE, CASTLE
-        notation: '帅五进一'
+socket.emit("move_made", {
+  move: {
+    from: { row: 9, col: 4 },
+    to: { row: 8, col: 4 },
+    piece: { type: "KING", color: "RED" },
+    capturedPiece: null,
+    moveType: "NORMAL", // NORMAL, CAPTURE, CASTLE
+    notation: "帅五进一",
+  },
+  gameState: {
+    // 更新后的游戏状态
+    currentPlayer: "BLACK",
+    moveHistory: [
+      // 历史移动记录
+    ],
+    checkStatus: {
+      inCheck: false,
+      checkedKing: null,
     },
-    gameState: {
-        // 更新后的游戏状态
-        currentPlayer: 'BLACK',
-        moveHistory: [
-            // 历史移动记录
-        ],
-        checkStatus: {
-            inCheck: false,
-            checkedKing: null
-        }
-    },
-    timeRemaining: {
-        red: 595,
-        black: 600
-    }
+  },
+  timeRemaining: {
+    red: 595,
+    black: 600,
+  },
 });
 ```
 
 ### 3. 游戏结束
 
 #### 服务端 → 房间内所有用户
+
 ```javascript
 // 游戏结束
-socket.emit('game_ended', {
-    result: {
-        winner: 'RED', // RED, BLACK, DRAW
-        reason: 'CHECKMATE', // CHECKMATE, STALEMATE, TIMEOUT, RESIGN, DRAW_AGREEMENT
-        finalPosition: {
-            // 最终棋盘状态
-        }
+socket.emit("game_ended", {
+  result: {
+    winner: "RED", // RED, BLACK, DRAW
+    reason: "CHECKMATE", // CHECKMATE, STALEMATE, TIMEOUT, RESIGN, DRAW_AGREEMENT
+    finalPosition: {
+      // 最终棋盘状态
     },
-    gameStats: {
-        duration: 1800, // 游戏时长（秒）
-        totalMoves: 45,
-        capturedPieces: {
-            red: ['PAWN', 'HORSE'],
-            black: ['CANNON', 'GUARD']
-        }
-    }
+  },
+  gameStats: {
+    duration: 1800, // 游戏时长（秒）
+    totalMoves: 45,
+    capturedPieces: {
+      red: ["PAWN", "HORSE"],
+      black: ["CANNON", "GUARD"],
+    },
+  },
 });
 ```
 
 ### 4. 特殊操作
 
 #### 客户端 → 服务端
+
 ```javascript
 // 请求和棋
-socket.emit('request_draw');
+socket.emit("request_draw");
 
 // 认输
-socket.emit('resign');
+socket.emit("resign");
 
 // 请求悔棋
-socket.emit('request_undo');
+socket.emit("request_undo");
 
 // 响应和棋/悔棋请求
-socket.emit('respond_request', {
-    type: 'DRAW_REQUEST', // DRAW_REQUEST, UNDO_REQUEST
-    accept: true
+socket.emit("respond_request", {
+  type: "DRAW_REQUEST", // DRAW_REQUEST, UNDO_REQUEST
+  accept: true,
 });
 ```
 
 #### 服务端 → 房间内所有用户
+
 ```javascript
 // 和棋请求
-socket.emit('draw_requested', {
-    fromPlayer: 'user123',
-    message: '玩家请求和棋'
+socket.emit("draw_requested", {
+  fromPlayer: "user123",
+  message: "玩家请求和棋",
 });
 
 // 悔棋请求
-socket.emit('undo_requested', {
-    fromPlayer: 'user123',
-    targetMove: {
-        // 要撤销的移动
-    }
+socket.emit("undo_requested", {
+  fromPlayer: "user123",
+  targetMove: {
+    // 要撤销的移动
+  },
 });
 
 // 请求被响应
-socket.emit('request_responded', {
-    type: 'DRAW_REQUEST',
-    accepted: true,
-    respondedBy: 'user456'
+socket.emit("request_responded", {
+  type: "DRAW_REQUEST",
+  accepted: true,
+  respondedBy: "user456",
 });
 ```
 
@@ -367,31 +387,32 @@ socket.emit('request_responded', {
 ### 1. AI 移动
 
 #### 服务端 → 房间内所有用户
+
 ```javascript
 // AI 思考中
-socket.emit('ai_thinking', {
-    aiColor: 'BLACK',
-    estimatedTime: 3000 // 预计思考时间（毫秒）
+socket.emit("ai_thinking", {
+  aiColor: "BLACK",
+  estimatedTime: 3000, // 预计思考时间（毫秒）
 });
 
 // AI 移动
-socket.emit('ai_move_made', {
-    move: {
-        from: {row: 2, col: 1},
-        to: {row: 4, col: 2},
-        piece: {type: 'HORSE', color: 'BLACK'},
-        capturedPiece: null,
-        notation: '马二进三'
-    },
-    aiAnalysis: {
-        evaluationScore: -0.3,
-        searchDepth: 6,
-        nodesSearched: 15000,
-        thinkingTime: 2500
-    },
-    gameState: {
-        // 更新后的游戏状态
-    }
+socket.emit("ai_move_made", {
+  move: {
+    from: { row: 2, col: 1 },
+    to: { row: 4, col: 2 },
+    piece: { type: "HORSE", color: "BLACK" },
+    capturedPiece: null,
+    notation: "马二进三",
+  },
+  aiAnalysis: {
+    evaluationScore: -0.3,
+    searchDepth: 6,
+    nodesSearched: 15000,
+    thinkingTime: 2500,
+  },
+  gameState: {
+    // 更新后的游戏状态
+  },
 });
 ```
 
@@ -400,45 +421,48 @@ socket.emit('ai_move_made', {
 ### 1. 观战者管理
 
 #### 服务端 → 房间内所有用户
+
 ```javascript
 // 观战者加入
-socket.emit('spectator_joined', {
-    spectator: {
-        userId: 'user789',
-        username: '观战者1',
-        avatar: 'avatar_url'
-    },
-    spectatorCount: 5
+socket.emit("spectator_joined", {
+  spectator: {
+    userId: "user789",
+    username: "观战者1",
+    avatar: "avatar_url",
+  },
+  spectatorCount: 5,
 });
 
 // 观战者离开
-socket.emit('spectator_left', {
-    userId: 'user789',
-    spectatorCount: 4
+socket.emit("spectator_left", {
+  userId: "user789",
+  spectatorCount: 4,
 });
 ```
 
 ### 2. 观战者消息
 
 #### 客户端 → 服务端
+
 ```javascript
 // 观战者发送聊天消息
-socket.emit('spectator_chat', {
-    message: '精彩的对局！'
+socket.emit("spectator_chat", {
+  message: "精彩的对局！",
 });
 ```
 
 #### 服务端 → 房间内所有用户
+
 ```javascript
 // 观战者聊天
-socket.emit('chat_message', {
-    from: {
-        userId: 'user789',
-        username: '观战者1',
-        role: 'SPECTATOR'
-    },
-    message: '精彩的对局！',
-    timestamp: '2025-06-01T10:15:30Z'
+socket.emit("chat_message", {
+  from: {
+    userId: "user789",
+    username: "观战者1",
+    role: "SPECTATOR",
+  },
+  message: "精彩的对局！",
+  timestamp: "2025-06-01T10:15:30Z",
 });
 ```
 
@@ -447,35 +471,38 @@ socket.emit('chat_message', {
 ### 1. 发送消息
 
 #### 客户端 → 服务端
+
 ```javascript
-socket.emit('send_message', {
-    message: '下得不错！',
-    type: 'TEXT', // TEXT, EMOJI, QUICK_MESSAGE
-    recipient: null // null表示房间内所有人，或指定用户ID
+socket.emit("send_message", {
+  message: "下得不错！",
+  type: "TEXT", // TEXT, EMOJI, QUICK_MESSAGE
+  recipient: null, // null表示房间内所有人，或指定用户ID
 });
 ```
 
 #### 服务端 → 房间内所有用户（或指定用户）
+
 ```javascript
-socket.emit('chat_message', {
-    from: {
-        userId: 'user123',
-        username: '玩家1',
-        role: 'PLAYER'
-    },
-    message: '下得不错！',
-    type: 'TEXT',
-    isPrivate: false,
-    timestamp: '2025-06-01T10:15:30Z'
+socket.emit("chat_message", {
+  from: {
+    userId: "user123",
+    username: "玩家1",
+    role: "PLAYER",
+  },
+  message: "下得不错！",
+  type: "TEXT",
+  isPrivate: false,
+  timestamp: "2025-06-01T10:15:30Z",
 });
 ```
 
 ### 2. 快捷消息
 
 #### 客户端 → 服务端
+
 ```javascript
-socket.emit('quick_message', {
-    messageId: 'GOOD_MOVE' // GOOD_MOVE, THANKS, GG, THINKING
+socket.emit("quick_message", {
+  messageId: "GOOD_MOVE", // GOOD_MOVE, THANKS, GG, THINKING
 });
 ```
 
@@ -484,46 +511,48 @@ socket.emit('quick_message', {
 ### 通用错误格式
 
 ```javascript
-socket.emit('error', {
-    code: 'ERROR_CODE',
-    message: '错误描述',
-    details: {
-        // 额外错误信息
-    },
-    timestamp: '2025-06-01T10:15:30Z'
+socket.emit("error", {
+  code: "ERROR_CODE",
+  message: "错误描述",
+  details: {
+    // 额外错误信息
+  },
+  timestamp: "2025-06-01T10:15:30Z",
 });
 ```
 
 ### 常见错误代码
 
-| 错误代码 | 描述 |
-|---------|------|
-| `AUTH_REQUIRED` | 需要认证 |
-| `INVALID_TOKEN` | 无效令牌 |
-| `ROOM_NOT_FOUND` | 房间不存在 |
-| `ROOM_FULL` | 房间已满 |
-| `PERMISSION_DENIED` | 权限不足 |
-| `INVALID_MOVE` | 无效移动 |
-| `GAME_NOT_STARTED` | 游戏未开始 |
-| `NOT_YOUR_TURN` | 不是你的回合 |
-| `CONNECTION_ERROR` | 连接错误 |
+| 错误代码            | 描述         |
+| ------------------- | ------------ |
+| `AUTH_REQUIRED`     | 需要认证     |
+| `INVALID_TOKEN`     | 无效令牌     |
+| `ROOM_NOT_FOUND`    | 房间不存在   |
+| `ROOM_FULL`         | 房间已满     |
+| `PERMISSION_DENIED` | 权限不足     |
+| `INVALID_MOVE`      | 无效移动     |
+| `GAME_NOT_STARTED`  | 游戏未开始   |
+| `NOT_YOUR_TURN`     | 不是你的回合 |
+| `CONNECTION_ERROR`  | 连接错误     |
 
 ## 心跳检测
 
 ### 客户端 → 服务端
+
 ```javascript
 // 每30秒发送心跳
-socket.emit('ping', {
-    timestamp: Date.now()
+socket.emit("ping", {
+  timestamp: Date.now(),
 });
 ```
 
 ### 服务端 → 客户端
+
 ```javascript
 // 心跳响应
-socket.emit('pong', {
-    timestamp: Date.now(),
-    serverTime: '2025-06-01T10:15:30Z'
+socket.emit("pong", {
+  timestamp: Date.now(),
+  serverTime: "2025-06-01T10:15:30Z",
 });
 ```
 
@@ -532,22 +561,24 @@ socket.emit('pong', {
 ### 客户端请求完整状态
 
 #### 客户端 → 服务端
+
 ```javascript
-socket.emit('request_full_state');
+socket.emit("request_full_state");
 ```
 
 #### 服务端 → 客户端
+
 ```javascript
-socket.emit('full_state', {
-    roomInfo: {
-        // 完整房间信息
-    },
-    gameState: {
-        // 完整游戏状态
-    },
-    userList: [
-        // 房间内所有用户
-    ]
+socket.emit("full_state", {
+  roomInfo: {
+    // 完整房间信息
+  },
+  gameState: {
+    // 完整游戏状态
+  },
+  userList: [
+    // 房间内所有用户
+  ],
 });
 ```
 
@@ -556,24 +587,26 @@ socket.emit('full_state', {
 ### 重连后状态恢复
 
 #### 客户端重连后
+
 ```javascript
-socket.emit('reconnect_restore', {
-    lastKnownState: {
-        roomId: 'room_123',
-        lastMoveId: 'move_45'
-    }
+socket.emit("reconnect_restore", {
+  lastKnownState: {
+    roomId: "room_123",
+    lastMoveId: "move_45",
+  },
 });
 ```
 
 #### 服务端响应
+
 ```javascript
-socket.emit('state_restored', {
-    missedEvents: [
-        // 断线期间错过的事件
-    ],
-    currentState: {
-        // 当前完整状态
-    }
+socket.emit("state_restored", {
+  missedEvents: [
+    // 断线期间错过的事件
+  ],
+  currentState: {
+    // 当前完整状态
+  },
 });
 ```
 
@@ -582,58 +615,59 @@ socket.emit('state_restored', {
 ### 完整交互流程
 
 #### 1. 前端加入房间流程
+
 ```javascript
 // 第一步：通过HTTP API加入房间
-fetch('/room/join?roomId=room_123', {
-    method: 'POST',
-    headers: {
-        'Authorization': 'Bearer ' + jwt_token,
-        'Content-Type': 'application/json'
-    }
+fetch("/room/join?roomId=room_123", {
+  method: "POST",
+  headers: {
+    Authorization: "Bearer " + jwt_token,
+    "Content-Type": "application/json",
+  },
 })
-.then(response => response.json())
-.then(data => {
+  .then((response) => response.json())
+  .then((data) => {
     if (data.code === 200) {
-        // 第二步：加入成功后，建立Socket连接
-        connectToRoom(data.data.id);
+      // 第二步：加入成功后，建立Socket连接
+      connectToRoom(data.data.id);
     }
-});
+  });
 
 // 第二步：建立Socket连接
 function connectToRoom(roomId) {
-    const socket = io('ws://localhost:8080', {
-        query: {
-            roomId: roomId,
-            token: localStorage.getItem('jwt_token')
-        }
-    });
+  const socket = io("ws://localhost:8080", {
+    query: {
+      roomId: roomId,
+      token: localStorage.getItem("jwt_token"),
+    },
+  });
 
-    // 认证处理
-    socket.on('need_auth', () => {
-        socket.emit('auth', {
-            token: localStorage.getItem('jwt_token')
-        });
+  // 认证处理
+  socket.on("need_auth", () => {
+    socket.emit("auth", {
+      token: localStorage.getItem("jwt_token"),
     });
+  });
 
-    socket.on('auth_success', (data) => {
-        console.log('进入房间成功:', data.roomInfo);
-        // 初始化游戏界面
-        initChessBoard(data.roomInfo);
-    });
+  socket.on("auth_success", (data) => {
+    console.log("进入房间成功:", data.roomInfo);
+    // 初始化游戏界面
+    initChessBoard(data.roomInfo);
+  });
 
-    // 游戏事件监听
-    socket.on('player_ready_changed', (data) => {
-        updatePlayerReadyStatus(data);
-    });
+  // 游戏事件监听
+  socket.on("player_ready_changed", (data) => {
+    updatePlayerReadyStatus(data);
+  });
 
-    socket.on('game_started', (data) => {
-        startGame(data.gameState);
-    });
+  socket.on("game_started", (data) => {
+    startGame(data.gameState);
+  });
 
-    socket.on('move_made', (data) => {
-        updateChessBoard(data.gameState);
-        addMoveToHistory(data.move);
-    });
+  socket.on("move_made", (data) => {
+    updateChessBoard(data.gameState);
+    addMoveToHistory(data.move);
+  });
 }
 ```
 
@@ -645,27 +679,27 @@ function connectToRoom(roomId) {
 public class RoomSocketServer implements InitializingBean {
     @Autowired
     private SocketIOServer socketIOServer;
-    
+
     @Autowired
     private RoomService roomService; // 复用现有HTTP服务
-    
+
     @Override
     public void afterPropertiesSet() {
         // 连接处理
         socketIOServer.addConnectListener(client -> {
             String roomId = client.getHandshakeData().getSingleUrlParam("roomId");
             String token = client.getHandshakeData().getSingleUrlParam("token");
-            
+
             if (roomId == null || token == null) {
                 client.disconnect();
                 return;
             }
-            
+
             // 验证用户是否在该房间中
             try {
                 Claims claims = JwtUtil.parseToken(token);
                 Long userId = Long.valueOf(claims.getSubject());
-                
+
                 // 检查用户是否在房间中
                 Room room = roomService.getById(roomId);
                 if (room == null || !isUserInRoom(room, userId)) {
@@ -673,99 +707,99 @@ public class RoomSocketServer implements InitializingBean {
                     client.disconnect();
                     return;
                 }
-                
+
                 // 认证成功，加入房间
                 client.joinRoom(roomId);
                 client.set("userId", userId);
                 client.set("roomId", roomId);
-                
+
                 client.sendEvent("auth_success", buildAuthSuccessData(room, userId));
-                
+
                 // 广播用户进入
                 client.getNamespace().getRoomOperations(roomId)
                     .sendEvent("user_entered_room", buildUserEnteredData(userId));
-                
+
             } catch (Exception e) {
                 client.sendEvent("auth_fail", "token无效");
                 client.disconnect();
             }
         });
-        
+
         // 游戏准备
-        socketIOServer.addEventListener("player_ready", Boolean.class, 
+        socketIOServer.addEventListener("player_ready", Boolean.class,
             (client, ready, ackSender) -> {
                 String roomId = client.get("roomId");
                 Long userId = client.get("userId");
-                
+
                 // 更新准备状态
                 updatePlayerReadyStatus(roomId, userId, ready);
-                
+
                 // 广播准备状态变化
                 client.getNamespace().getRoomOperations(roomId)
-                    .sendEvent("player_ready_changed", 
+                    .sendEvent("player_ready_changed",
                         Map.of("userId", userId, "ready", ready));
-                
+
                 // 检查是否可以开始游戏
                 if (canStartGame(roomId)) {
                     startGame(roomId);
                 }
             });
-        
+
         // 棋子移动
         socketIOServer.addEventListener("move_piece", Map.class,
             (client, moveData, ackSender) -> {
                 String roomId = client.get("roomId");
                 Long userId = client.get("userId");
-                
+
                 // 验证移动
                 if (validateMove(roomId, userId, moveData)) {
                     // 执行移动
                     GameState newState = executeMove(roomId, moveData);
-                    
+
                     // 广播移动
                     client.getNamespace().getRoomOperations(roomId)
                         .sendEvent("move_made", buildMoveData(moveData, newState));
                 } else {
-                    client.sendEvent("invalid_move", 
+                    client.sendEvent("invalid_move",
                         Map.of("message", "无效移动", "move", moveData));
                 }
             });
-        
+
         socketIOServer.start();
     }
-    
+
     private boolean isUserInRoom(Room room, Long userId) {
-        return userId.equals(room.getPlayer1Id()) || 
+        return userId.equals(room.getPlayer1Id()) ||
                userId.equals(room.getPlayer2Id());
     }
 }
 ```
 
-#### 3. Android客户端示例
+#### 3. Android 客户端示例
 
-```java
+````java
 // 房间加入后连接Socket
 public class ChessGameActivity extends AppCompatActivity {
     private Socket socket;
     private String roomId;
-    
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        
+
         // 获取从房间列表传来的roomId
         roomId = getIntent().getStringExtra("roomId");
-        
+
         connectToGameRoom();
     }
-    
+
     private void connectToGameRoom() {
         try {
             IO.Options options = new IO.Options();
             options.query = "roomId=" + roomId + "&token=" + getJwtToken();
-            
+
             socket = IO.socket("ws://localhost:8080", options);
-            
+
             socket.on("auth_success", args -> {
                 JSONObject data = (JSONObject) args[0];
                 runOnUiThread(() -> {
@@ -773,35 +807,35 @@ public class ChessGameActivity extends AppCompatActivity {
                     initGameUI(data);
                 });
             });
-            
+
             socket.on("game_started", args -> {
                 JSONObject gameState = (JSONObject) args[0];
                 runOnUiThread(() -> {
                     startChessGame(gameState);
                 });
             });
-            
+
             socket.on("move_made", args -> {
                 JSONObject moveData = (JSONObject) args[0];
                 runOnUiThread(() -> {
                     updateChessBoard(moveData);
                 });
             });
-            
+
             socket.connect();
-            
+
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
-    
+
     // 玩家准备
     public void onPlayerReady() {
         if (socket != null) {
             socket.emit("player_ready", true);
         }
     }
-    
+
     // 移动棋子
     public void makeMove(int fromRow, int fromCol, int toRow, int toCol) {
         if (socket != null) {
@@ -810,14 +844,14 @@ public class ChessGameActivity extends AppCompatActivity {
                 JSONObject from = new JSONObject();
                 from.put("row", fromRow);
                 from.put("col", fromCol);
-                
+
                 JSONObject to = new JSONObject();
                 to.put("row", toRow);
                 to.put("col", toCol);
-                
+
                 moveData.put("from", from);
                 moveData.put("to", to);
-                
+
                 socket.emit("move_piece", moveData);
             } catch (Exception e) {
                 e.printStackTrace();
@@ -849,16 +883,18 @@ public class ChessGameActivity extends AppCompatActivity {
 // 前端开发配置
 const SOCKET_URL = 'ws://localhost:8080';
 const API_BASE_URL = 'http://localhost:8080/api';
-```
+````
 
 ### 生产环境
+
 ```javascript
-// 前端生产配置  
-const SOCKET_URL = 'wss://your-domain.com';
-const API_BASE_URL = 'https://your-domain.com/api';
+// 前端生产配置
+const SOCKET_URL = "wss://your-domain.com";
+const API_BASE_URL = "https://your-domain.com/api";
 ```
 
 ### 后端配置
+
 ```yaml
 # application.yml
 server:
@@ -877,5 +913,5 @@ socketio:
 
 ---
 
-*本文档版本：v1.0*  
-*最后更新：2025年6月1日*
+_本文档版本：v1.0_  
+_最后更新：2025 年 6 月 1 日_

@@ -6,6 +6,7 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -26,6 +27,10 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
 @Configuration
 @EnableMethodSecurity // 启用方法级安全注解
 public class JwtSecurityConfig {
+
+  @Autowired
+  private JwtUtil jwtUtil; // 添加这行注入JwtUtil
+
   @Bean
   public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
     http.csrf(csrf -> csrf.disable())
@@ -37,7 +42,7 @@ public class JwtSecurityConfig {
     return http.build();
   }
 
-  public static class JwtAuthenticationFilter extends OncePerRequestFilter {
+  private class JwtAuthenticationFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
         throws ServletException, IOException {
@@ -45,7 +50,8 @@ public class JwtSecurityConfig {
       if (header != null && header.startsWith("Bearer ")) {
         String token = header.substring(7);
         try {
-          Claims claims = JwtUtil.parseToken(token);
+          // 修改这里：使用注入的实例而不是静态方法
+          Claims claims = jwtUtil.parseToken(token); // 原来可能是 JwtUtil.parseToken(token)
           String userId = claims.get("userId", String.class);
           String email = claims.get("email", String.class);
           UserDetails userDetails = User.withUsername(email)
