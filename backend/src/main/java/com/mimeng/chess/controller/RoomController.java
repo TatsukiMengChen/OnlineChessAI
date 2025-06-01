@@ -39,7 +39,7 @@ public class RoomController {
 
   @PreAuthorize("isAuthenticated()")
   @PostMapping("/close")
-  public ApiRes<String> closeRoom(@RequestParam String roomId, Authentication authentication) {
+  public ApiRes<String> closeRoom(@RequestParam("roomId") String roomId, Authentication authentication) {
     Long userId = Long.valueOf(authentication.getDetails().toString());
     ServiceResult<String> result = roomService.closeRoom(roomId, userId);
     if (result.isSuccess()) {
@@ -51,7 +51,7 @@ public class RoomController {
 
   @PreAuthorize("isAuthenticated()")
   @PostMapping("/join")
-  public ApiRes<Room> joinRoom(@RequestParam String roomId, Authentication authentication) {
+  public ApiRes<Room> joinRoom(@RequestParam("roomId") String roomId, Authentication authentication) {
     Long userId = Long.valueOf(authentication.getDetails().toString());
     ServiceResult<Room> result = roomService.joinRoom(roomId, userId);
     if (result.isSuccess()) {
@@ -63,7 +63,7 @@ public class RoomController {
 
   @PreAuthorize("isAuthenticated()")
   @PostMapping("/quit")
-  public ApiRes<String> quitRoom(@RequestParam String roomId, Authentication authentication) {
+  public ApiRes<String> quitRoom(@RequestParam("roomId") String roomId, Authentication authentication) {
     Long userId = Long.valueOf(authentication.getDetails().toString());
     ServiceResult<String> result = roomService.quitRoom(roomId, userId);
     if (result.isSuccess()) {
