@@ -1,5 +1,6 @@
 package com.mimeng.chess.activity;
 
+import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.ImageView;
@@ -44,6 +45,10 @@ public class RoomListActivity extends BaseActivity implements RoomListAdapter.On
   private AuthManager authManager;
   private Gson gson;
 
+  private static final String PREFS_ROOM = "room_prefs";
+  private static final String KEY_LAST_CREATED_ROOM_ID = "last_created_room_id";
+  private static final String KEY_LAST_CREATED_ROOM_NAME = "last_created_room_name";
+
   @Override
   protected void onCreate(Bundle savedInstanceState) {
     super.onCreate(savedInstanceState);
@@ -69,7 +74,22 @@ public class RoomListActivity extends BaseActivity implements RoomListAdapter.On
     initViews();
     setupListeners();
     setupWindowInsets();
+    // 移除本地房间自动跳转逻辑
     loadRoomList();
+  }
+
+  private void saveMyCreatedRoom(String roomId, String roomName) {
+    SharedPreferences prefs = getSharedPreferences(PREFS_ROOM, MODE_PRIVATE);
+    prefs.edit().putString(KEY_LAST_CREATED_ROOM_ID, roomId)
+        .putString(KEY_LAST_CREATED_ROOM_NAME, roomName)
+        .apply();
+  }
+
+  private void clearMyCreatedRoom() {
+    SharedPreferences prefs = getSharedPreferences(PREFS_ROOM, MODE_PRIVATE);
+    prefs.edit().remove(KEY_LAST_CREATED_ROOM_ID)
+        .remove(KEY_LAST_CREATED_ROOM_NAME)
+        .apply();
   }
 
   private void initData() {
@@ -141,6 +161,19 @@ public class RoomListActivity extends BaseActivity implements RoomListAdapter.On
                 List<Room> rooms = roomListRes.data;
                 adapter.updateRooms(rooms);
 
+                // 检查自己是否是player1或player2，且房间未关闭
+                int myUserId = authManager.getUser() != null ? authManager.getUser().id : -1;
+                if (rooms != null) {
+                  for (Room room : rooms) {
+                    boolean isMine = (room.player1Id != null && room.player1Id == myUserId)
+                        || (room.player2Id != null && room.player2Id == myUserId);
+                    if (isMine && !Room.Status.CLOSED.equals(room.status)) {
+                      RoomDetailActivity.start(RoomListActivity.this, room.id, room.name);
+                      return;
+                    }
+                  }
+                }
+
                 if (rooms == null || rooms.isEmpty()) {
                   showEmptyState(true);
                 } else {
@@ -175,8 +208,9 @@ public class RoomListActivity extends BaseActivity implements RoomListAdapter.On
   private void showCreateRoomDialog() {
     CreateRoomDialog dialog = new CreateRoomDialog(this);
     dialog.setOnRoomCreatedListener(room -> {
-      // 房间创建成功，刷新列表
-      loadRoomList();
+      // 房间创建成功，保存本地并跳转
+      saveMyCreatedRoom(room.id, room.name);
+      RoomDetailActivity.start(RoomListActivity.this, room.id, room.name);
     });
     dialog.show();
   }
@@ -304,6 +338,7 @@ public class RoomListActivity extends BaseActivity implements RoomListAdapter.On
 
               if (apiResponse.code == 200) {
                 showMessage("已退出房间");
+                clearMyCreatedRoom(); // 退出房间后清除本地记录
                 loadRoomList(); // 刷新列表
               } else {
                 showMessage(apiResponse.msg != null ? apiResponse.msg : "退出房间失败");
@@ -346,6 +381,7 @@ public class RoomListActivity extends BaseActivity implements RoomListAdapter.On
 
               if (apiResponse.code == 200) {
                 showMessage("房间已关闭");
+                clearMyCreatedRoom(); // 关闭房间后清除本地记录
                 loadRoomList(); // 刷新列表
               } else {
                 showMessage(apiResponse.msg != null ? apiResponse.msg : "关闭房间失败");
