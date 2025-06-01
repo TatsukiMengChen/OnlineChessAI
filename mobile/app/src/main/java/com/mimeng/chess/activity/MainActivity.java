@@ -20,7 +20,6 @@ import com.mimeng.chess.utils.AuthManager;
 public class MainActivity extends BaseActivity {
   private TextView tvWelcome;
   private TextView tvUserInfo;
-  private Button btnAiGame;
   private Button btnOnlineGame;
   private Button btnChangePassword;
   private Button btnLogout;
@@ -53,7 +52,6 @@ public class MainActivity extends BaseActivity {
   private void initViews() {
     tvWelcome = findViewById(R.id.tv_welcome);
     tvUserInfo = findViewById(R.id.tv_user_info);
-    btnAiGame = findViewById(R.id.btn_ai_game);
     btnOnlineGame = findViewById(R.id.btn_online_game);
     btnChangePassword = findViewById(R.id.btn_change_password);
     btnLogout = findViewById(R.id.btn_logout);
@@ -70,7 +68,6 @@ public class MainActivity extends BaseActivity {
    * 设置监听器
    */
   private void setupListeners() {
-    btnAiGame.setOnClickListener(v -> startAiGame());
     btnOnlineGame.setOnClickListener(v -> startOnlineGame());
     btnChangePassword.setOnClickListener(v -> showChangePasswordDialog());
     btnLogout.setOnClickListener(v -> showLogoutDialog());
@@ -96,14 +93,6 @@ public class MainActivity extends BaseActivity {
     tvWelcome.setText("欢迎回来！");
     String userInfo = String.format("邮箱: %s\nID: %d", user.email, user.id);
     tvUserInfo.setText(userInfo);
-  }
-
-  /**
-   * 开始人机对战
-   */
-  private void startAiGame() {
-    // TODO: 实现人机对战功能
-    showMessage("人机对战功能即将上线");
   }
 
   /**
