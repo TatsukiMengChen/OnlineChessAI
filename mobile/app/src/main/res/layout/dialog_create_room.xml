@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+  android:layout_width="match_parent"
+  android:layout_height="wrap_content"
+  android:orientation="vertical"
+  android:padding="24dp">
+
+  <TextView
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:text="创建房间"
+    android:textColor="@android:color/black"
+    android:textSize="18sp"
+    android:textStyle="bold" />
+
+  <TextView
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginTop="8dp"
+    android:text="房间名称（可选）："
+    android:textColor="#666666"
+    android:textSize="14sp" />
+
+  <EditText
+    android:id="@+id/et_room_name"
+    android:layout_width="match_parent"
+    android:layout_height="48dp"
+    android:layout_marginTop="8dp"
+    android:background="@android:drawable/edit_text"
+    android:hint="留空将自动生成房间名称"
+    android:inputType="text"
+    android:maxLength="20"
+    android:paddingHorizontal="12dp"
+    android:textSize="14sp" />
+
+  <LinearLayout
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginTop="24dp"
+    android:orientation="horizontal">
+
+    <Button
+      android:id="@+id/btn_cancel"
+      android:layout_width="0dp"
+      android:layout_height="48dp"
+      android:layout_marginEnd="8dp"
+      android:layout_weight="1"
+      android:background="@android:color/transparent"
+      android:text="取消"
+      android:textColor="#666666"
+      android:textSize="16sp" />
+
+    <Button
+      android:id="@+id/btn_confirm"
+      android:layout_width="0dp"
+      android:layout_height="48dp"
+      android:layout_marginStart="8dp"
+      android:layout_weight="1"
+      android:background="#4CAF50"
+      android:text="创建"
+      android:textColor="@android:color/white"
+      android:textSize="16sp"
+      android:textStyle="bold" />
+
+  </LinearLayout>
+
+</LinearLayout>

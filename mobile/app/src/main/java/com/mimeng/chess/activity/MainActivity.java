@@ -8,7 +8,6 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AlertDialog;
-import androidx.appcompat.app.AppCompatActivity;
 
 import com.mimeng.chess.R;
 import com.mimeng.chess.api.auth.LoginRes;
@@ -18,7 +17,7 @@ import com.mimeng.chess.utils.AuthManager;
 /**
  * 主页面 - 登录后的主界面
  */
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends BaseActivity {
   private TextView tvWelcome;
   private TextView tvUserInfo;
   private Button btnAiGame;
@@ -38,9 +37,6 @@ public class MainActivity extends AppCompatActivity {
 
     super.onCreate(savedInstanceState);
     setContentView(R.layout.activity_main);
-
-    // 设置状态栏图标为深色，适配白色背景
-    getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
 
     initViews();
     initData();
@@ -111,8 +107,8 @@ public class MainActivity extends AppCompatActivity {
    * 开始在线对战
    */
   private void startOnlineGame() {
-    // TODO: 实现在线对战功能
-    showMessage("在线对战功能即将上线");
+    Intent intent = new Intent(this, RoomListActivity.class);
+    startActivity(intent);
   }
 
   /**

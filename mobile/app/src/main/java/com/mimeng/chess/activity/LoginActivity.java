@@ -31,7 +31,7 @@ import java.io.IOException;
 /**
  * 登录页面
  */
-public class LoginActivity extends AppCompatActivity {
+public class LoginActivity extends BaseActivity {
   private EditText etEmail;
   private EditText etPassword;
   private Button btnLogin;

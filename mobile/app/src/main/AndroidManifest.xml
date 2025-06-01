@@ -46,11 +46,16 @@
             android:exported="false"
             android:screenOrientation="portrait"
             android:windowSoftInputMode="adjustResize|stateHidden"
-            android:theme="@style/Theme.OnlineChessAI" />
-
-        <!-- 主页 -->
+            android:theme="@style/Theme.OnlineChessAI" />        <!-- 主页 -->
         <activity
             android:name="com.mimeng.chess.activity.MainActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.OnlineChessAI" />
+
+        <!-- 房间列表页 -->
+        <activity
+            android:name="com.mimeng.chess.activity.RoomListActivity"
             android:exported="false"
             android:screenOrientation="portrait"
             android:theme="@style/Theme.OnlineChessAI" />

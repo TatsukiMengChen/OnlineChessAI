@@ -33,7 +33,7 @@ import java.io.IOException;
 /**
  * 忘记密码页面
  */
-public class ForgotPasswordActivity extends AppCompatActivity {
+public class ForgotPasswordActivity extends BaseActivity {
   private EditText etEmail;
   private EditText etCode;
   private EditText etNewPassword;

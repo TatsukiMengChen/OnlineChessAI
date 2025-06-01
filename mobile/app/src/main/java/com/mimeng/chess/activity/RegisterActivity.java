@@ -34,7 +34,7 @@ import java.io.IOException;
 /**
  * 注册页面
  */
-public class RegisterActivity extends AppCompatActivity {
+public class RegisterActivity extends BaseActivity {
   private EditText etEmail;
   private EditText etPassword;
   private EditText etCode;
