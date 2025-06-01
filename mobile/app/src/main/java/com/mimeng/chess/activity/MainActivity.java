@@ -12,24 +12,18 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import com.mimeng.chess.R;
 import com.mimeng.chess.api.auth.LoginRes;
-import com.mimeng.chess.api.room.CreateRoomReq;
-import com.mimeng.chess.api.room.RoomApi;
+import com.mimeng.chess.dialog.ChangePasswordDialog;
 import com.mimeng.chess.utils.AuthManager;
-
-import okhttp3.Call;
-import okhttp3.Response;
-import java.io.IOException;
 
 /**
  * 主页面 - 登录后的主界面
  */
 public class MainActivity extends AppCompatActivity {
-
   private TextView tvWelcome;
   private TextView tvUserInfo;
   private Button btnAiGame;
   private Button btnOnlineGame;
-  private Button btnTestApi;
+  private Button btnChangePassword;
   private Button btnLogout;
   private AuthManager authManager;
   private long lastBackPressedTime = 0;
@@ -62,7 +56,7 @@ public class MainActivity extends AppCompatActivity {
     tvUserInfo = findViewById(R.id.tv_user_info);
     btnAiGame = findViewById(R.id.btn_ai_game);
     btnOnlineGame = findViewById(R.id.btn_online_game);
-    btnTestApi = findViewById(R.id.btn_test_api);
+    btnChangePassword = findViewById(R.id.btn_change_password);
     btnLogout = findViewById(R.id.btn_logout);
   }
 
@@ -79,7 +73,7 @@ public class MainActivity extends AppCompatActivity {
   private void setupListeners() {
     btnAiGame.setOnClickListener(v -> startAiGame());
     btnOnlineGame.setOnClickListener(v -> startOnlineGame());
-    btnTestApi.setOnClickListener(v -> testApiWithAuth());
+    btnChangePassword.setOnClickListener(v -> showChangePasswordDialog());
     btnLogout.setOnClickListener(v -> showLogoutDialog());
   }
 
@@ -122,49 +116,14 @@ public class MainActivity extends AppCompatActivity {
   }
 
   /**
-   * 测试需要认证的API
+   * 显示修改密码对话框
    */
-  private void testApiWithAuth() {
-    // 测试获取房间列表 - 这个接口不需要认证
-    RoomApi.instance.listRooms(new okhttp3.Callback() {
-      @Override
-      public void onFailure(Call call, IOException e) {
-        runOnUiThread(() -> showMessage("房间列表请求失败: " + e.getMessage()));
-      }
-
-      @Override
-      public void onResponse(Call call, Response response) throws IOException {
-        String responseBody = response.body().string();
-        runOnUiThread(() -> {
-          if (response.isSuccessful()) {
-            showMessage("房间列表获取成功");
-          } else {
-            showMessage("房间列表请求失败: " + response.code());
-          }
-        });
-      }
+  private void showChangePasswordDialog() {
+    ChangePasswordDialog dialog = new ChangePasswordDialog(this);
+    dialog.setOnPasswordChangedListener(() -> {
+      showMessage("密码修改成功，下次登录时请使用新密码");
     });
-
-    // 测试创建房间 - 这个接口需要认证
-    CreateRoomReq createReq = new CreateRoomReq("测试房间");
-    RoomApi.instance.createRoom(createReq, new okhttp3.Callback() {
-      @Override
-      public void onFailure(Call call, IOException e) {
-        runOnUiThread(() -> showMessage("创建房间请求失败: " + e.getMessage()));
-      }
-
-      @Override
-      public void onResponse(Call call, Response response) throws IOException {
-        String responseBody = response.body().string();
-        runOnUiThread(() -> {
-          if (response.isSuccessful()) {
-            showMessage("创建房间成功！拦截器已自动添加Bearer token");
-          } else {
-            showMessage("创建房间失败: " + response.code() + " - " + responseBody);
-          }
-        });
-      }
-    });
+    dialog.show();
   }
 
   /**
