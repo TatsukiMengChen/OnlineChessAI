@@ -13,6 +13,7 @@ public class SocketIOConfig {
     config.setTcpNoDelay(true);
     config.setSoLinger(0);
     com.corundumstudio.socketio.Configuration serverConfig = new com.corundumstudio.socketio.Configuration();
+    serverConfig.setHostname("0.0.0.0"); // 监听所有网卡
     serverConfig.setPort(9092); // 可根据需要修改端口
     serverConfig.setSocketConfig(config);
     serverConfig.setOrigin(null);
