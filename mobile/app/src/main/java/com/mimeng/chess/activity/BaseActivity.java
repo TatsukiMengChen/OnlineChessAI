@@ -141,12 +141,13 @@ public abstract class BaseActivity extends AppCompatActivity {
       ViewCompat.setOnApplyWindowInsetsListener(rootView, (v, insets) -> {
         Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
 
-        // 应用内边距，避免内容被系统UI遮挡
+        // 只应用顶部状态栏内边距，底部导航栏不设置内边距
+        // 让子类可以根据需要自定义处理
         v.setPadding(
-            systemBars.left,
-            systemBars.top,
-            systemBars.right,
-            systemBars.bottom);
+            0, // 左边距设为0
+            systemBars.top, // 保留状态栏内边距
+            0, // 右边距设为0
+            0); // 底部内边距设为0，让内容可以延伸到导航栏
 
         return insets;
       });
@@ -318,6 +319,50 @@ public abstract class BaseActivity extends AppCompatActivity {
       if (decorView != null) {
         decorView.setSystemUiVisibility(View.SYSTEM_UI_FLAG_VISIBLE);
       }
+    }
+  }
+
+  /**
+   * 应用窗口内边距适配 - 完整版本
+   * 子类可以调用此方法来应用完整的系统栏内边距
+   */
+  protected void applyFullWindowInsets() {
+    View rootView = findViewById(android.R.id.content);
+    if (rootView != null) {
+      ViewCompat.setOnApplyWindowInsetsListener(rootView, (v, insets) -> {
+        Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
+
+        // 应用完整的系统栏内边距
+        v.setPadding(
+            systemBars.left,
+            systemBars.top,
+            systemBars.right,
+            systemBars.bottom);
+
+        return insets;
+      });
+    }
+  }
+
+  /**
+   * 应用窗口内边距适配 - 仅状态栏版本
+   * 子类可以调用此方法来只应用状态栏内边距
+   */
+  protected void applyStatusBarOnlyInsets() {
+    View rootView = findViewById(android.R.id.content);
+    if (rootView != null) {
+      ViewCompat.setOnApplyWindowInsetsListener(rootView, (v, insets) -> {
+        Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
+
+        // 只应用状态栏内边距
+        v.setPadding(
+            0,
+            systemBars.top,
+            0,
+            0);
+
+        return insets;
+      });
     }
   }
 }

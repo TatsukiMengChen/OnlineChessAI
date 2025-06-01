@@ -38,6 +38,9 @@ public class MainActivity extends BaseActivity {
     super.onCreate(savedInstanceState);
     setContentView(R.layout.activity_main);
 
+    // 应用仅状态栏的内边距策略
+    applyStatusBarOnlyInsets();
+
     initViews();
     initData();
     setupListeners();

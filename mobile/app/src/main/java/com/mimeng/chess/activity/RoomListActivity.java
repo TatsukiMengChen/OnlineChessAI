@@ -46,12 +46,17 @@ public class RoomListActivity extends BaseActivity implements RoomListAdapter.On
 
   @Override
   protected void onCreate(Bundle savedInstanceState) {
-    super.onCreate(savedInstanceState); // 删除标题栏
+    super.onCreate(savedInstanceState);
+
+    // 删除标题栏
     if (getSupportActionBar() != null) {
       getSupportActionBar().hide();
     }
 
     setContentView(R.layout.activity_room_list);
+
+    // 应用仅状态栏的内边距策略
+    applyStatusBarOnlyInsets();
 
     initData();
     initViews();

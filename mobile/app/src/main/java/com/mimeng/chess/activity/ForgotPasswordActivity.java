@@ -15,6 +15,10 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.graphics.Insets;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowCompat;
+import androidx.core.view.WindowInsetsCompat;
 
 import com.google.gson.Gson;
 import com.mimeng.chess.R;
@@ -33,7 +37,7 @@ import java.io.IOException;
 /**
  * 忘记密码页面
  */
-public class ForgotPasswordActivity extends BaseActivity {
+public class ForgotPasswordActivity extends AppCompatActivity {
   private EditText etEmail;
   private EditText etCode;
   private EditText etNewPassword;
@@ -48,20 +52,35 @@ public class ForgotPasswordActivity extends BaseActivity {
 
   @Override
   protected void onCreate(Bundle savedInstanceState) {
+    super.onCreate(savedInstanceState);
+
     // 删除标题栏
     if (getSupportActionBar() != null) {
       getSupportActionBar().hide();
     }
 
-    super.onCreate(savedInstanceState);
+    // 启用沉浸式状态栏，让内容延伸到状态栏下方
+    WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
     setContentView(R.layout.activity_forgot_password);
 
-    // 设置状态栏图标为深色，适配白色背景
-    getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
-
     initViews();
+    setupStatusBarPadding();
     initData();
     setupListeners();
+  }
+
+  /**
+   * 设置状态栏填充
+   */
+  private void setupStatusBarPadding() {
+    View statusBarSpacer = findViewById(R.id.status_bar_spacer);
+    if (statusBarSpacer != null) {
+      ViewCompat.setOnApplyWindowInsetsListener(statusBarSpacer, (v, insets) -> {
+        Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.statusBars());
+        v.setPadding(0, systemBars.top, 0, 0);
+        return insets;
+      });
+    }
   }
 
   /**

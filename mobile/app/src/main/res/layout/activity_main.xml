@@ -5,7 +5,6 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/chess_cream"
-    android:fitsSystemWindows="true"
     android:paddingStart="16dp"
     android:paddingEnd="16dp">
 
@@ -30,8 +29,8 @@
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        android:layout_marginTop="32dp"
-        android:layout_marginBottom="24dp" />    <!-- 用户信息卡片 -->
+        android:layout_marginTop="24dp"
+        android:layout_marginBottom="24dp" /><!-- 用户信息卡片 -->
     <androidx.cardview.widget.CardView
         android:id="@+id/card_user_info"
         style="@style/Widget.Chess.CardView"

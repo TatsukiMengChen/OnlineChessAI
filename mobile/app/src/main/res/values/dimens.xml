@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <!-- 状态栏高度 -->
+  <dimen name="status_bar_height">24dp</dimen>
+
+  <!-- 通用间距 -->
+  <dimen name="margin_small">8dp</dimen>
+  <dimen name="margin_medium">16dp</dimen>
+  <dimen name="margin_large">24dp</dimen>
+  <dimen name="margin_xlarge">32dp</dimen>
+
+  <!-- 卡片圆角 -->
+  <dimen name="card_corner_radius">16dp</dimen>
+  <dimen name="button_corner_radius">12dp</dimen>
+
+  <!-- 按钮高度 -->
+  <dimen name="button_height">56dp</dimen>
+  <dimen name="input_height">56dp</dimen>
+</resources>
