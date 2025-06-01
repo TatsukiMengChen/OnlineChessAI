@@ -1,0 +1,240 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+  xmlns:app="http://schemas.android.com/apk/res-auto"
+  android:id="@+id/scroll_view"
+  android:layout_width="match_parent"
+  android:layout_height="match_parent"
+  android:background="@drawable/gradient_background"
+  android:fillViewport="true"
+  android:scrollbars="none"
+  android:overScrollMode="never">
+
+  <androidx.constraintlayout.widget.ConstraintLayout
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:clipToPadding="false"
+    android:clipChildren="false"
+    android:paddingBottom="48dp">
+
+    <!-- 装饰性背景 -->
+    <View
+      android:layout_width="150dp"
+      android:layout_height="150dp"
+      android:background="@drawable/chess_pattern_background"
+      android:alpha="0.05"
+      app:layout_constraintEnd_toEndOf="parent"
+      app:layout_constraintTop_toTopOf="parent" />
+
+    <!-- 顶部空间 -->
+    <View
+      android:id="@+id/top_spacer"
+      android:layout_width="0dp"
+      android:layout_height="48dp"
+      android:layout_marginStart="24dp"
+      android:layout_marginEnd="24dp"
+      app:layout_constraintEnd_toEndOf="parent"
+      app:layout_constraintStart_toStartOf="parent"
+      app:layout_constraintTop_toTopOf="parent" />
+
+    <!-- Logo -->
+    <ImageView
+      android:id="@+id/iv_logo"
+      android:layout_width="120dp"
+      android:layout_height="120dp"
+      android:layout_marginStart="24dp"
+      android:layout_marginEnd="24dp"
+      android:layout_marginBottom="24dp"
+      android:src="@mipmap/ic_launcher"
+      android:contentDescription="应用Logo"
+      android:elevation="4dp"
+      app:layout_constraintBottom_toTopOf="@+id/tv_welcome"
+      app:layout_constraintEnd_toEndOf="parent"
+      app:layout_constraintStart_toStartOf="parent"
+      app:layout_constraintTop_toBottomOf="@+id/top_spacer" />
+
+    <!-- 欢迎标题 -->
+    <TextView
+      android:id="@+id/tv_welcome"
+      style="@style/TextAppearance.Chess.Headline"
+      android:layout_width="wrap_content"
+      android:layout_height="wrap_content"
+      android:layout_marginStart="24dp"
+      android:layout_marginEnd="24dp"
+      android:text="创建账号"
+      android:textSize="32sp"
+      android:textColor="@color/chess_brown_dark"
+      android:letterSpacing="0.02"
+      app:layout_constraintBottom_toTopOf="@+id/tv_subtitle"
+      app:layout_constraintEnd_toEndOf="parent"
+      app:layout_constraintStart_toStartOf="parent"
+      app:layout_constraintTop_toBottomOf="@+id/iv_logo" />
+
+    <!-- 副标题 -->
+    <TextView
+      android:id="@+id/tv_subtitle"
+      style="@style/TextAppearance.Chess.Body"
+      android:layout_width="wrap_content"
+      android:layout_height="wrap_content"
+      android:layout_marginStart="24dp"
+      android:layout_marginEnd="24dp"
+      android:layout_marginTop="8dp"
+      android:layout_marginBottom="48dp"
+      android:text="请填写您的注册信息"
+      android:textSize="16sp"
+      android:textColor="@color/text_secondary"
+      android:alpha="0.8"
+      app:layout_constraintBottom_toTopOf="@+id/register_card"
+      app:layout_constraintEnd_toEndOf="parent"
+      app:layout_constraintStart_toStartOf="parent"
+      app:layout_constraintTop_toBottomOf="@+id/tv_welcome" />
+
+    <!-- 注册表单卡片 -->
+    <androidx.cardview.widget.CardView
+      android:id="@+id/register_card"
+      style="@style/Widget.Chess.CardView"
+      android:layout_width="0dp"
+      android:layout_height="wrap_content"
+      android:layout_marginStart="32dp"
+      android:layout_marginEnd="32dp"
+      android:layout_marginBottom="32dp"
+      app:cardElevation="4dp"
+      app:cardCornerRadius="16dp"
+      app:layout_constraintBottom_toTopOf="@+id/btn_send_code"
+      app:layout_constraintEnd_toEndOf="parent"
+      app:layout_constraintStart_toStartOf="parent"
+      app:layout_constraintTop_toBottomOf="@+id/tv_subtitle">
+
+      <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="28dp">
+
+        <!-- 邮箱输入框 -->
+        <EditText
+          android:id="@+id/et_email"
+          style="@style/Widget.Chess.EditText"
+          android:layout_width="match_parent"
+          android:layout_height="56dp"
+          android:layout_marginBottom="24dp"
+          android:hint="邮箱地址"
+          android:inputType="textEmailAddress"
+          android:maxLines="1"
+          android:imeOptions="actionNext"
+          android:drawableStart="@drawable/ic_email_24"
+          android:drawablePadding="16dp"
+          android:paddingStart="16dp"
+          android:paddingEnd="16dp" />
+
+        <!-- 密码输入框 -->
+        <EditText
+          android:id="@+id/et_password"
+          style="@style/Widget.Chess.EditText"
+          android:layout_width="match_parent"
+          android:layout_height="56dp"
+          android:layout_marginBottom="24dp"
+          android:hint="密码（6位以上）"
+          android:inputType="textPassword"
+          android:maxLines="1"
+          android:imeOptions="actionNext"
+          android:drawableStart="@drawable/ic_lock_24"
+          android:drawablePadding="16dp"
+          android:paddingStart="16dp"
+          android:paddingEnd="16dp" />
+
+        <!-- 验证码输入框 -->
+        <EditText
+          android:id="@+id/et_code"
+          style="@style/Widget.Chess.EditText"
+          android:layout_width="match_parent"
+          android:layout_height="56dp"
+          android:hint="邮箱验证码"
+          android:inputType="number"
+          android:maxLines="1"
+          android:imeOptions="actionDone"
+          android:drawableStart="@drawable/ic_verified_24"
+          android:drawablePadding="16dp"
+          android:paddingStart="16dp"
+          android:paddingEnd="16dp"
+          android:enabled="false" />
+
+      </LinearLayout>
+
+    </androidx.cardview.widget.CardView>
+
+    <!-- 发送验证码按钮 -->
+    <Button
+      android:id="@+id/btn_send_code"
+      style="@style/Widget.Chess.Button.Outline"
+      android:layout_width="0dp"
+      android:layout_height="56dp"
+      android:layout_marginStart="32dp"
+      android:layout_marginEnd="32dp"
+      android:layout_marginBottom="16dp"
+      android:text="发送验证码"
+      android:textSize="16sp"
+      app:cornerRadius="16dp"
+      app:layout_constraintBottom_toTopOf="@+id/btn_register"
+      app:layout_constraintEnd_toEndOf="parent"
+      app:layout_constraintStart_toStartOf="parent"
+      app:layout_constraintTop_toBottomOf="@+id/register_card" />
+
+    <!-- 注册按钮 -->
+    <Button
+      android:id="@+id/btn_register"
+      style="@style/Widget.Chess.Button"
+      android:layout_width="0dp"
+      android:layout_height="60dp"
+      android:layout_marginStart="32dp"
+      android:layout_marginEnd="32dp"
+      android:layout_marginBottom="40dp"
+      android:text="注册"
+      android:textSize="18sp"
+      android:elevation="3dp"
+      android:enabled="false"
+      app:cornerRadius="16dp"
+      app:layout_constraintBottom_toTopOf="@+id/ll_login"
+      app:layout_constraintEnd_toEndOf="parent"
+      app:layout_constraintStart_toStartOf="parent"
+      app:layout_constraintTop_toBottomOf="@+id/btn_send_code" />
+
+    <!-- 登录提示 -->
+    <LinearLayout
+      android:id="@+id/ll_login"
+      android:layout_width="wrap_content"
+      android:layout_height="wrap_content"
+      android:orientation="horizontal"
+      android:layout_marginStart="24dp"
+      android:layout_marginEnd="24dp"
+      android:layout_marginBottom="32dp"
+      app:layout_constraintBottom_toBottomOf="parent"
+      app:layout_constraintEnd_toEndOf="parent"
+      app:layout_constraintStart_toStartOf="parent"
+      app:layout_constraintTop_toBottomOf="@+id/btn_register">
+
+      <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="已有账号？"
+        android:textSize="15sp"
+        android:textColor="@color/text_secondary" />
+
+      <TextView
+        android:id="@+id/tv_login"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="6dp"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:clickable="true"
+        android:focusable="true"
+        android:padding="8dp"
+        android:text="立即登录"
+        android:textSize="15sp"
+        android:textColor="@color/chess_gold"
+        android:textStyle="bold" />
+
+    </LinearLayout>
+
+  </androidx.constraintlayout.widget.ConstraintLayout>
+
+</ScrollView>

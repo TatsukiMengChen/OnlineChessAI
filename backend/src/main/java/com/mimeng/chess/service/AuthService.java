@@ -11,5 +11,6 @@ public interface AuthService {
   ServiceResult<AuthRes> login(String email, String password);
 
   ServiceResult<String> changePassword(String email, String oldPassword, String newPassword);
-}
 
+  ServiceResult<String> resetPassword(String email, String code, String newPassword);
+}

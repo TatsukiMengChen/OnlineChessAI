@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout
+  xmlns:android="http://schemas.android.com/apk/res/android"
+  xmlns:app="http://schemas.android.com/apk/res-auto"
+  android:layout_width="match_parent"
+  android:layout_height="match_parent"
+  android:background="@drawable/splash_background"
+  android:padding="32dp">
+
+  <!-- 装饰性背景元素 -->
+  <View
+    android:layout_width="200dp"
+    android:layout_height="200dp"
+    android:background="@drawable/chess_pattern_background"
+    android:alpha="0.1"
+    app:layout_constraintEnd_toEndOf="parent"
+    app:layout_constraintTop_toTopOf="parent" />
+
+  <!-- 应用 Logo -->
+  <ImageView
+    android:id="@+id/iv_logo"
+    android:layout_width="140dp"
+    android:layout_height="140dp"
+    android:src="@mipmap/ic_launcher"
+    android:contentDescription="应用Logo"
+    android:elevation="8dp"
+    app:layout_constraintBottom_toTopOf="@+id/tv_app_name"
+    app:layout_constraintEnd_toEndOf="parent"
+    app:layout_constraintStart_toStartOf="parent"
+    app:layout_constraintTop_toTopOf="parent"
+    app:layout_constraintVertical_chainStyle="packed" />
+
+  <!-- 应用名称 -->
+  <TextView
+    android:id="@+id/tv_app_name"
+    style="@style/TextAppearance.Chess.Headline"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:layout_marginTop="32dp"
+    android:text="在线象棋"
+    android:textSize="32sp"
+    android:elevation="4dp"
+    android:shadowColor="@color/chess_brown_dark"
+    android:shadowDx="2"
+    android:shadowDy="2"
+    android:shadowRadius="4"
+    app:layout_constraintBottom_toTopOf="@+id/tv_subtitle"
+    app:layout_constraintEnd_toEndOf="parent"
+    app:layout_constraintStart_toStartOf="parent"
+    app:layout_constraintTop_toBottomOf="@+id/iv_logo" />    <!-- 副标题 -->
+  <TextView
+    android:id="@+id/tv_subtitle"
+    style="@style/TextAppearance.Chess.Body"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:layout_marginTop="16dp"
+    android:text="智能对弈，乐趣无穷"
+    android:textSize="18sp"
+    android:textStyle="italic"
+    android:textColor="@color/chess_brown_dark"
+    app:layout_constraintBottom_toTopOf="@+id/progress_indicator"
+    app:layout_constraintEnd_toEndOf="parent"
+    app:layout_constraintStart_toStartOf="parent"
+    app:layout_constraintTop_toBottomOf="@+id/tv_app_name" />
+
+  <!-- 加载指示器 -->
+  <ProgressBar
+    android:id="@+id/progress_indicator"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:layout_marginTop="64dp"
+    android:indeterminate="true"
+    android:indeterminateTint="@color/chess_gold"
+    app:layout_constraintBottom_toBottomOf="parent"
+    app:layout_constraintEnd_toEndOf="parent"
+    app:layout_constraintStart_toStartOf="parent"
+    app:layout_constraintTop_toBottomOf="@+id/tv_subtitle" />
+
+</androidx.constraintlayout.widget.ConstraintLayout>

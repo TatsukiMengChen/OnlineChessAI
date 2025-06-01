@@ -1,24 +1,165 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:gravity="center"
-    android:background="#FFFFFF">
+    android:background="@color/chess_cream"
+    android:padding="24dp">
 
+    <!-- 装饰性背景 -->
+    <View
+        android:layout_width="150dp"
+        android:layout_height="150dp"
+        android:background="@drawable/chess_pattern_background"
+        android:alpha="0.05"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <!-- 欢迎标题 -->
     <TextView
-        android:id="@+id/tv_hello"
+        android:id="@+id/tv_welcome"
+        style="@style/TextAppearance.Chess.Headline"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Hello, Chess!"
+        android:text="欢迎回来！"
         android:textSize="24sp"
-        android:textColor="#222222"/>
+        android:textColor="@color/chess_brown_dark"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginTop="32dp"
+        android:layout_marginBottom="24dp" />
 
-    <Button
-        android:id="@+id/btn_login"
+    <!-- 用户信息卡片 -->
+    <androidx.cardview.widget.CardView
+        android:id="@+id/card_user_info"
+        style="@style/Widget.Chess.CardView"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="24dp"
+        android:layout_marginBottom="32dp"
+        app:layout_constraintTop_toBottomOf="@id/tv_welcome"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="20dp">
+
+            <TextView
+                style="@style/TextAppearance.Chess.Title"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="用户信息"
+                android:textSize="18sp"
+                android:textColor="@color/chess_brown_dark"
+                android:layout_marginBottom="12dp"
+                android:drawablePadding="8dp"
+                android:drawableStart="@drawable/ic_person_24"
+                android:drawableTint="@color/chess_gold" />
+
+            <TextView
+                android:id="@+id/tv_user_info"
+                style="@style/TextAppearance.Chess.Body"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="加载中..."
+                android:textSize="14sp"
+                android:textColor="@color/text_secondary"
+                android:lineSpacingExtra="4dp" />
+
+        </LinearLayout>
+
+    </androidx.cardview.widget.CardView>
+
+    <!-- 游戏功能标题 -->
+    <TextView
+        android:id="@+id/tv_game_features"
+        style="@style/TextAppearance.Chess.Title"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Login" />
+        android:text="游戏功能"
+        android:textSize="20sp"
+        android:textColor="@color/chess_brown_dark"
+        android:layout_marginTop="32dp"
+        android:layout_marginBottom="16dp"
+        android:drawablePadding="8dp"
+        android:drawableStart="@drawable/ic_smart_toy_24"
+        android:drawableTint="@color/chess_gold"
+        app:layout_constraintTop_toBottomOf="@id/card_user_info"
+        app:layout_constraintStart_toStartOf="parent" />
 
-</LinearLayout>
+    <!-- 功能按钮网格 -->
+    <LinearLayout
+        android:id="@+id/layout_game_buttons"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginTop="16dp"
+        android:layout_marginBottom="32dp"
+        app:layout_constraintTop_toBottomOf="@id/tv_game_features"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
 
+        <Button
+            android:id="@+id/btn_ai_game"
+            style="@style/Widget.Chess.Button.Secondary"
+            android:layout_width="0dp"
+            android:layout_height="56dp"
+            android:layout_weight="1"
+            android:layout_marginEnd="8dp"
+            android:text="人机对战"
+            android:textSize="16sp"
+            android:drawableTop="@drawable/ic_smart_toy_24"
+            android:drawableTint="@color/chess_brown_medium"
+            android:paddingTop="8dp"
+            android:paddingBottom="8dp" />
+
+        <Button
+            android:id="@+id/btn_online_game"
+            style="@style/Widget.Chess.Button.Secondary"
+            android:layout_width="0dp"
+            android:layout_height="56dp"
+            android:layout_weight="1"
+            android:layout_marginStart="8dp"
+            android:text="在线对战"
+            android:textSize="16sp"
+            android:drawableTop="@drawable/ic_people_24"
+            android:drawableTint="@color/chess_brown_medium"
+            android:paddingTop="8dp"
+            android:paddingBottom="8dp" />
+    </LinearLayout>
+
+    <!-- 测试API按钮 -->
+    <Button
+        android:id="@+id/btn_test_api"
+        style="@style/Widget.Chess.Button.Primary"
+        android:layout_width="0dp"
+        android:layout_height="56dp"
+        android:text="测试房间API"
+        android:textSize="16sp"
+        android:layout_marginBottom="16dp"
+        app:layout_constraintBottom_toTopOf="@id/btn_logout"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <!-- 退出登录按钮 -->
+    <Button
+        android:id="@+id/btn_logout"
+        style="@style/Widget.Chess.Button.Outline"
+        android:layout_width="0dp"
+        android:layout_height="56dp"
+        android:text="退出登录"
+        android:textSize="16sp"
+        android:drawableStart="@drawable/ic_logout_24"
+        android:drawablePadding="8dp"
+        android:drawableTint="@color/chess_brown_medium"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginBottom="16dp" />
+
+</androidx.constraintlayout.widget.ConstraintLayout>

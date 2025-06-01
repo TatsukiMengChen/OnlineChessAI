@@ -1,3 +1,11 @@
 <resources>
     <string name="app_name">Online Chess AI</string>
+
+    <!-- 登录页面提示文字 - 使用font标签确保与输入文字大小一致 -->
+    <string name="hint_input_email">
+        <font size="16">邮箱地址</font>
+    </string>
+    <string name="hint_input_password">
+        <font size="16">密码</font>
+    </string>
 </resources>

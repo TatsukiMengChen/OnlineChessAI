@@ -9,7 +9,7 @@ public abstract class BaseApi {
     protected static final Gson gson = new Gson();
 
     protected void post(String url, Object body, Callback callback) {
-        String json = gson.toJson(body);
+        String json = body != null ? gson.toJson(body) : "{}";
         ApiManager.post(url, json, callback);
     }
 
@@ -17,4 +17,3 @@ public abstract class BaseApi {
         ApiManager.get(url, callback);
     }
 }
-

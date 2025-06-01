@@ -10,8 +10,8 @@ public class AuthApi extends BaseApi {
         public static final String BASE = BASE_URL + "/auth";
         public static final String LOGIN = BASE + "/login";
         public static final String REGISTER = BASE + "/register";
-        public static final String SEND_CODE = BASE + "/send-code";
-        public static final String CHANGE_PASSWORD = BASE + "/change-password";
+        public static final String SEND_CODE = BASE + "/sendCode";
+        public static final String CHANGE_PASSWORD = BASE + "/changePassword";
     }
 
     public void sendCode(Object data, Callback callback) {

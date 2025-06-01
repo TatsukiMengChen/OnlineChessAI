@@ -103,4 +103,20 @@ public class AuthServiceImpl implements AuthService {
     userService.updateById(user); // 修改为 updateById，避免主键冲突
     return ServiceResult.success("密码修改成功");
   }
+
+  @Override
+  public ServiceResult<String> resetPassword(String email, String code, String newPassword) {
+    String redisCode = redisTemplate.opsForValue().get("email:code:" + email);
+    if (redisCode == null || !StringUtils.hasText(redisCode) || !redisCode.equals(code)) {
+      return ServiceResult.error("验证码错误或已过期");
+    }
+    User user = userService.findByEmail(email);
+    if (user == null) {
+      return ServiceResult.error("用户不存在");
+    }
+    user.setPassword(passwordEncoder.encode(newPassword));
+    userService.updateById(user);
+    redisTemplate.delete("email:code:" + email);
+    return ServiceResult.success("密码重置成功");
+  }
 }

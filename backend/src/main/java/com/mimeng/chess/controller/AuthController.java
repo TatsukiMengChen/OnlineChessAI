@@ -14,6 +14,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
+import com.mimeng.chess.dto.auth.ResetPasswordDTO;
 
 @RestController
 @RequestMapping("/auth")
@@ -33,7 +34,8 @@ public class AuthController {
 
   @PostMapping("/register")
   public ApiRes<AuthRes> register(@Valid @RequestBody RegisterDTO registerDTO) {
-    ServiceResult<AuthRes> result = authService.register(registerDTO.getEmail(), registerDTO.getPassword(), registerDTO.getCode());
+    ServiceResult<AuthRes> result = authService.register(registerDTO.getEmail(), registerDTO.getPassword(),
+        registerDTO.getCode());
     if (result.isSuccess()) {
       return ApiRes.success(result.getMessage(), result.getData());
     } else {
@@ -61,6 +63,16 @@ public class AuthController {
       return ApiRes.success(result.getMessage(), result.getData());
     } else {
       return ApiRes.error(400, "修改失败", result.getMessage());
+    }
+  }
+
+  @PostMapping("/resetPassword")
+  public ApiRes<String> resetPassword(@Valid @RequestBody ResetPasswordDTO dto) {
+    ServiceResult<String> result = authService.resetPassword(dto.getEmail(), dto.getCode(), dto.getNewPassword());
+    if (result.isSuccess()) {
+      return ApiRes.success(result.getMessage(), result.getData());
+    } else {
+      return ApiRes.error(400, "重置失败", result.getMessage());
     }
   }
 }

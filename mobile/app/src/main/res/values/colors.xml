@@ -1,10 +1,35 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources>    <!-- Chess Theme Colors -->
+    <color name="chess_brown_primary">#8B4513</color>
+    <color name="chess_brown_dark">#654321</color>
+    <color name="chess_brown_medium">#795548</color>
+    <color name="chess_brown_light">#A0522D</color>
+    <color name="chess_gold">#FFD700</color>
+    <color name="chess_gold_dark">#DAA520</color>
+    <color name="chess_cream">#FFF8DC</color>
+    <color name="chess_beige">#F5DEB3</color>
+
+    <!-- UI Colors -->
+    <color name="surface_light">#FAFAFA</color>
+    <color name="surface_variant">#F5F5F5</color>
+    <color name="outline">#E0E0E0</color>
+    <color name="text_primary">#212121</color>
+    <color name="text_secondary">#757575</color>
+    <color name="text_hint">#9E9E9E</color>
+
+    <!-- Accent Colors -->
+    <color name="success_green">#4CAF50</color>
+    <color name="warning_orange">#FF9800</color>
+    <color name="error_red">#F44336</color>
+
+    <!-- Standard Colors -->
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+
+    <!-- Legacy Colors (for compatibility) -->
     <color name="purple_200">#FFBB86FC</color>
     <color name="purple_500">#FF6200EE</color>
     <color name="purple_700">#FF3700B3</color>
     <color name="teal_200">#FF03DAC5</color>
     <color name="teal_700">#FF018786</color>
-    <color name="black">#FF000000</color>
-    <color name="white">#FFFFFFFF</color>
 </resources>
