@@ -23,29 +23,54 @@ public interface SocketEventListener {
   void onAuthFail(String message);
 
   /**
-   * 房间状态更新
+   * 玩家加入房间
    */
-  void onRoomStateUpdated(JsonObject roomState);
+  void onPlayerJoined(JsonObject data);
 
   /**
-   * 用户进入房间
+   * 玩家离开房间
    */
-  void onUserEntered(String username);
-
-  /**
-   * 用户离开房间
-   */
-  void onUserLeft(String username);
+  void onPlayerLeft(JsonObject data);
 
   /**
    * 玩家准备状态变化
    */
-  void onPlayerReadyChanged(String username, boolean ready);
+  void onPlayerReadyChanged(JsonObject data);
+
+  /**
+   * 房间状态更新
+   */
+  void onRoomStatus(JsonObject data);
+
+  /**
+   * 游戏状态更新
+   */
+  void onGameState(JsonObject data);
 
   /**
    * 游戏开始
    */
   void onGameStarted(JsonObject gameState);
+
+  /**
+   * 玩家投降
+   */
+  void onPlayerSurrendered(JsonObject data);
+
+  /**
+   * 房间即将关闭
+   */
+  void onRoomClosing(JsonObject data);
+
+  /**
+   * 房间被关闭
+   */
+  void onRoomClosed(String message);
+
+  /**
+   * 房间不存在
+   */
+  void onRoomNotFound(String message);
 
   /**
    * 连接错误

@@ -99,17 +99,54 @@ socket.emit("auth_fail", {
 
 当用户通过 Socket.IO 连接到已加入的房间后：
 
-#### 服务端 → 房间内所有用户
+#### 服务端 → 房间内其他用户（不包括自己）
 
 ```javascript
-// 广播用户进入房间
-socket.broadcast.to(roomId).emit("user_entered_room", {
-  user: {
-    userId: "user456",
-    username: "玩家2",
-    avatar: "avatar_url",
+// 广播玩家加入房间
+socket.broadcast.to(roomId).emit("player_joined", {
+  userId: "user456",
+  userName: "User456",
+  message: "User456 加入了房间",
+});
+```
+
+#### 服务端 → 新加入的用户
+
+```javascript
+// 发送认证成功消息
+socket.emit("auth_success", "鉴权成功");
+
+// 发送当前游戏状态
+socket.emit("game_state", {
+  status: "WAITING",
+  currentPlayer: "RED",
+  redPlayer: {
+    userId: "user123",
+    name: "User123",
+    ready: false,
+    online: true,
+    color: "RED"
   },
-  enterTime: "2025-06-01T10:05:00Z",
+  blackPlayer: null,
+  boardState: {
+    pieces: [...] // 10x9 棋盘数组
+  }
+});
+
+// 发送房间状态
+socket.emit("room_status", {
+  status: "waiting",
+  message: "等待玩家准备",
+  players: {
+    red: {
+      userId: "user123",
+      name: "User123",
+      ready: false,
+      online: true,
+      color: "RED"
+    }
+  },
+  waitingForPlayers: true
 });
 ```
 
@@ -124,43 +161,50 @@ socket.emit("get_room_state");
 #### 服务端响应
 
 ```javascript
-socket.emit('room_state', {
-    roomInfo: {
-        id: 'room_123',
-        name: '我的象棋房间',
-        status: 'playing',
-        player1: {
-            userId: 'user123',
-            username: '玩家1',
-            color: 'RED',
-            isReady: true,
-            isOnline: true
-        },
-        player2: {
-            userId: 'user456',
-            username: '玩家2',
-            color: 'BLACK',
-            isReady: true,
-            isOnline: true
-        },
-        spectators: [
-            {
-                userId: 'user789',
-                username: '观战者1'
-            }
-        ]
+// 发送游戏状态
+socket.emit("game_state", {
+  status: "PLAYING",
+  currentPlayer: "RED",
+  redPlayer: {
+    userId: "user123",
+    name: "User123",
+    ready: true,
+    online: true,
+    color: "RED"
+  },
+  blackPlayer: {
+    userId: "user456",
+    name: "User456",
+    ready: true,
+    online: true,
+    color: "BLACK"
+  },
+  boardState: {
+    pieces: [...] // 10x9 棋盘数组，格式：null 或 "red_king", "black_pawn" 等
+  }
+});
+
+// 发送房间状态
+socket.emit("room_status", {
+  status: "playing",
+  message: "游戏进行中，红方回合",
+  players: {
+    red: {
+      userId: "user123",
+      name: "User123",
+      ready: true,
+      online: true,
+      color: "RED"
     },
-    gameState: {
-        // 完整游戏状态（如果游戏已开始）
-        status: 'PLAYING',
-        currentPlayer: 'RED',
-        board: [...], // 棋盘状态
-        moveHistory: [...],
-        timeRemaining: {
-            red: 580,
-            black: 600
-        }
+    black: {
+      userId: "user456",
+      name: "User456",
+      ready: true,
+      online: true,
+      color: "BLACK"
     }
+  },
+  waitingForPlayers: false
 });
 ```
 
@@ -169,21 +213,28 @@ socket.emit('room_state', {
 #### 客户端 → 服务端
 
 ```javascript
-// 主动离开房间（也可能是断线）
+// 主动离开房间
 socket.emit("leave_room");
+// 或者直接断开连接
+socket.disconnect();
 ```
 
 #### 服务端 → 房间内其他用户
 
 ```javascript
-// 广播用户离开
-socket.broadcast.to(roomId).emit("user_left_room", {
+// 广播玩家离开
+socket.broadcast.to(roomId).emit("player_left", {
   userId: "user456",
-  username: "玩家2",
-  reason: "LEAVE", // LEAVE, DISCONNECT, KICKED
-  leaveTime: "2025-06-01T10:15:00Z",
+  userName: "User456",
+  message: "User456 离开了房间",
 });
 ```
+
+**注意事项：**
+
+- 玩家离开房间后，服务端会自动更新游戏状态和房间状态
+- 房间内其他玩家会收到更新的 `game_state` 和 `room_status` 事件
+- 如果房间变为空房间，服务端会自动清理房间资源
 
 ## 游戏逻辑
 
@@ -201,40 +252,125 @@ socket.emit("player_ready", {
 #### 服务端 → 房间内所有用户
 
 ```javascript
-// 玩家准备状态更新
+// 玩家准备状态更新广播
 socket.emit("player_ready_changed", {
   userId: "user123",
-  username: "玩家1",
+  userName: "User123",
   ready: true,
+  message: "User123 已准备",
 });
 
-// 游戏开始（当双方都准备好）
+// 游戏开始（当双方都准备好时）
 socket.emit("game_started", {
-  gameState: {
-    gameId: "game_123_456",
-    board: [
-      // 10x9 棋盘状态，null表示空位
+  message: "游戏开始！",
+});
+
+// 同时发送更新的游戏状态
+socket.emit("game_state", {
+  status: "PLAYING",
+  currentPlayer: "RED", // 红方先走
+  redPlayer: {
+    userId: "user123",
+    name: "User123",
+    ready: true,
+    online: true,
+    color: "RED",
+  },
+  blackPlayer: {
+    userId: "user456",
+    name: "User456",
+    ready: true,
+    online: true,
+    color: "BLACK",
+  },
+  boardState: {
+    pieces: [
+      // 10x9 棋盘初始状态
       [
-        { type: "ROOK", color: "BLACK", position: { row: 0, col: 0 } },
-        { type: "HORSE", color: "BLACK", position: { row: 0, col: 1 } },
-        // ... 完整棋盘布局
+        "black_rook",
+        "black_horse",
+        "black_elephant",
+        "black_advisor",
+        "black_king",
+        "black_advisor",
+        "black_elephant",
+        "black_horse",
+        "black_rook",
+      ],
+      [null, null, null, null, null, null, null, null, null],
+      [
+        null,
+        "black_cannon",
+        null,
+        null,
+        null,
+        null,
+        null,
+        "black_cannon",
+        null,
+      ],
+      [
+        "black_pawn",
+        null,
+        "black_pawn",
+        null,
+        "black_pawn",
+        null,
+        "black_pawn",
+        null,
+        "black_pawn",
+      ],
+      [null, null, null, null, null, null, null, null, null],
+      [null, null, null, null, null, null, null, null, null],
+      [
+        "red_pawn",
+        null,
+        "red_pawn",
+        null,
+        "red_pawn",
+        null,
+        "red_pawn",
+        null,
+        "red_pawn",
+      ],
+      [null, "red_cannon", null, null, null, null, null, "red_cannon", null],
+      [null, null, null, null, null, null, null, null, null],
+      [
+        "red_rook",
+        "red_horse",
+        "red_elephant",
+        "red_advisor",
+        "red_king",
+        "red_advisor",
+        "red_elephant",
+        "red_horse",
+        "red_rook",
       ],
     ],
-    currentPlayer: "RED", // 红方先走
-    gameStatus: "PLAYING",
-    moveHistory: [],
-    timeRemaining: {
-      red: 600,
-      black: 600,
+  },
+});
+
+// 发送更新的房间状态
+socket.emit("room_status", {
+  status: "playing",
+  message: "游戏进行中，红方回合",
+  players: {
+    red: {
+      /* 红方玩家信息 */
     },
-    lastMove: null,
-    checkStatus: {
-      inCheck: false,
-      checkedKing: null,
+    black: {
+      /* 黑方玩家信息 */
     },
   },
-  startTime: "2025-06-01T10:05:00Z",
+  waitingForPlayers: false,
 });
+```
+
+#### 服务端 → 客户端（准备失败）
+
+```javascript
+// 准备状态设置失败
+socket.emit("ready_failed", "设置准备状态失败");
 ```
 
 ### 2. 棋子移动
@@ -257,59 +393,73 @@ socket.emit("move_piece", {
 #### 服务端 → 客户端
 
 ```javascript
-// 棋子选择响应
+// 棋子选择成功响应
 socket.emit("piece_selected", {
+  userId: "user123",
   position: { row: 9, col: 4 },
-  piece: {
-    type: "KING",
-    color: "RED",
-  },
-  availableMoves: [
+});
+
+// 发送可移动位置
+socket.emit("available_moves", {
+  moves: [
     { row: 8, col: 4 },
     { row: 9, col: 3 },
     { row: 9, col: 5 },
   ],
 });
 
-// 移动无效
-socket.emit("invalid_move", {
-  message: "无效移动",
-  code: "INVALID_MOVE",
-  from: { row: 9, col: 4 },
-  to: { row: 8, col: 4 },
-});
+// 选择失败
+socket.emit("select_failed", "选择棋子失败");
 ```
 
 #### 服务端 → 房间内所有用户
 
 ```javascript
 // 移动成功广播
-socket.emit("move_made", {
-  move: {
-    from: { row: 9, col: 4 },
-    to: { row: 8, col: 4 },
-    piece: { type: "KING", color: "RED" },
-    capturedPiece: null,
-    moveType: "NORMAL", // NORMAL, CAPTURE, CASTLE
-    notation: "帅五进一",
-  },
-  gameState: {
-    // 更新后的游戏状态
-    currentPlayer: "BLACK",
-    moveHistory: [
-      // 历史移动记录
-    ],
+socket.emit("piece_moved", {
+  userId: "user123",
+  from: { row: 9, col: 4 },
+  to: { row: 8, col: 4 }
+});
+
+// 同时发送更新的游戏状态
+socket.emit("game_state", {
+  status: "PLAYING",
+  currentPlayer: "BLACK", // 轮到下一个玩家
+  redPlayer: { /* 玩家信息 */ },
+  blackPlayer: { /* 玩家信息 */ },
+  boardState: {
+    pieces: [...] // 更新后的棋盘状态
+  }
+});
+
+// 游戏结束（如果有胜负）
+socket.emit("game_ended", {
+  status: "RED_WIN", // RED_WIN, BLACK_WIN, DRAW
+  message: "红方获胜！"
+});
+```
+
+#### 服务端 → 客户端（移动失败）
+
+```javascript
+// 移动无效
+socket.emit("move_failed", "移动失败");
+```
+
     checkStatus: {
       inCheck: false,
       checkedKing: null,
     },
-  },
-  timeRemaining: {
-    red: 595,
-    black: 600,
-  },
+
+},
+timeRemaining: {
+red: 595,
+black: 600,
+},
 });
-```
+
+````
 
 ### 3. 游戏结束
 
@@ -334,7 +484,7 @@ socket.emit("game_ended", {
     },
   },
 });
-```
+````
 
 ### 4. 特殊操作
 

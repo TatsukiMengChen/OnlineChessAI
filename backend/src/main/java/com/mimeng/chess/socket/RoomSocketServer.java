@@ -196,10 +196,8 @@ public class RoomSocketServer implements InitializingBean {
               client.disconnect();
               return;
             }
-          }
-
-          // 从email中提取用户名作为显示名称
-          String userName = email.split("@")[0];
+          } // 使用用户ID作为显示名称，确保唯一性
+          String userName = "User" + userId;
 
           if (userName == null || roomId == null) {
             logger.warn("Client {} auth with incomplete data: userId={}, userName={}, roomId={}",
@@ -225,7 +223,6 @@ public class RoomSocketServer implements InitializingBean {
           boolean joined = gameManager.joinRoom(roomId, userId, userName);
           logger.info("GameManager.joinRoom result for user {} in room {}: {}",
               userId, roomId, joined);
-
           if (joined) {
             // 标记为已认证
             userInfo.isAuthenticated = true;
@@ -234,15 +231,16 @@ public class RoomSocketServer implements InitializingBean {
             logger.info("User {} ({}) successfully authenticated and joined room {}", userName, userId, roomId);
             client.sendEvent("auth_success", "鉴权成功");
 
-            // 广播玩家加入
-            broadcastToRoom(roomId, "player_joined", Map.of(
+            // 广播玩家加入事件（排除自己）
+            broadcastToRoomExcept(roomId, clientId, "player_joined", Map.of(
                 "userId", userId,
-                "userName", userName));
+                "userName", userName,
+                "message", userName + " 加入了房间"));
 
-            // 发送当前游戏状态
+            // 发送当前游戏状态给所有人
             sendGameState(roomId);
 
-            // 额外发送一次房间状态确保前端收到
+            // 发送房间状态给所有人
             sendRoomStatus(roomId);
           } else {
             logger.error("User {} ({}) failed to join room {} - GameManager.joinRoom returned false",
@@ -292,10 +290,8 @@ public class RoomSocketServer implements InitializingBean {
         logger.error("Error handling get_room_state: {}", e.getMessage(), e);
         client.sendEvent("error", "获取房间状态时发生错误");
       }
-    });
-
-    // 玩家准备事件
-    socketIOServer.addEventListener("player_ready", Map.class, (client, data, ackSender) -> {
+    }); // 玩家准备事件
+    socketIOServer.addEventListener("player_ready", Object.class, (client, data, ackSender) -> {
       try {
         UserInfo userInfo = clientUsers.get(client.getSessionId().toString());
         if (userInfo == null) {
@@ -304,20 +300,50 @@ public class RoomSocketServer implements InitializingBean {
           return;
         }
 
-        Boolean ready = (Boolean) data.get("ready");
+        // 处理不同格式的数据
+        Boolean ready = null;
+
+        if (data instanceof Map) {
+          @SuppressWarnings("unchecked")
+          Map<String, Object> map = (Map<String, Object>) data;
+          ready = (Boolean) map.get("ready");
+        } else if (data instanceof String) {
+          String dataStr = (String) data;
+          // 尝试解析JSON字符串
+          if (dataStr.trim().startsWith("{") && dataStr.trim().endsWith("}")) {
+            try {
+              String readyPattern = "\"ready\"\\s*:\\s*(true|false)";
+              java.util.regex.Pattern pattern = java.util.regex.Pattern.compile(readyPattern);
+              java.util.regex.Matcher matcher = pattern.matcher(dataStr);
+              if (matcher.find()) {
+                ready = Boolean.valueOf(matcher.group(1));
+              }
+            } catch (Exception jsonEx) {
+              logger.warn("Failed to parse ready JSON string: {}", jsonEx.getMessage());
+            }
+          }
+        }
+
         if (ready == null) {
           ready = true;
         }
-
         boolean success = gameManager.playerReady(userInfo.roomId, userInfo.userId, ready);
         if (success) {
           logger.info("Player {} ({}) ready status changed to {} in room {}",
               userInfo.userName, userInfo.userId, ready, userInfo.roomId);
 
-          // 广播玩家准备状态
+          // 广播玩家准备状态变更给所有人
           broadcastToRoom(userInfo.roomId, "player_ready_changed", Map.of(
               "userId", userInfo.userId,
-              "ready", ready));
+              "userName", userInfo.userName,
+              "ready", ready,
+              "message", userInfo.userName + (ready ? " 已准备" : " 取消准备")));
+
+          // 发送更新的游戏状态给所有人
+          sendGameState(userInfo.roomId);
+
+          // 发送房间状态给所有人
+          sendRoomStatus(userInfo.roomId);
 
           // 检查是否可以开始游戏
           if (ready && gameManager.tryStartGame(userInfo.roomId)) {
@@ -325,9 +351,6 @@ public class RoomSocketServer implements InitializingBean {
             broadcastToRoom(userInfo.roomId, "game_started", Map.of(
                 "message", "游戏开始！"));
           }
-
-          // 发送更新的游戏状态
-          sendGameState(userInfo.roomId);
         } else {
           logger.warn("Failed to set ready status for player {} in room {}", userInfo.userId, userInfo.roomId);
           client.sendEvent("ready_failed", "设置准备状态失败");
@@ -336,10 +359,8 @@ public class RoomSocketServer implements InitializingBean {
         logger.error("Error handling player_ready: {}", e.getMessage(), e);
         client.sendEvent("error", "处理准备状态时发生错误");
       }
-    });
-
-    // 选择棋子事件
-    socketIOServer.addEventListener("select_piece", Map.class, (client, data, ackSender) -> {
+    }); // 选择棋子事件
+    socketIOServer.addEventListener("select_piece", Object.class, (client, data, ackSender) -> {
       try {
         UserInfo userInfo = clientUsers.get(client.getSessionId().toString());
         if (userInfo == null) {
@@ -348,8 +369,40 @@ public class RoomSocketServer implements InitializingBean {
           return;
         }
 
-        Integer row = (Integer) data.get("row");
-        Integer col = (Integer) data.get("col");
+        Integer row = null;
+        Integer col = null;
+
+        // 处理不同格式的数据
+        if (data instanceof Map) {
+          @SuppressWarnings("unchecked")
+          Map<String, Object> map = (Map<String, Object>) data;
+          row = (Integer) map.get("row");
+          col = (Integer) map.get("col");
+        } else if (data instanceof String) {
+          String dataStr = (String) data;
+          if (dataStr.trim().startsWith("{") && dataStr.trim().endsWith("}")) {
+            try {
+              // 简单的JSON解析
+              String rowPattern = "\"row\"\\s*:\\s*(\\d+)";
+              String colPattern = "\"col\"\\s*:\\s*(\\d+)";
+
+              java.util.regex.Pattern pattern = java.util.regex.Pattern.compile(rowPattern);
+              java.util.regex.Matcher matcher = pattern.matcher(dataStr);
+              if (matcher.find()) {
+                row = Integer.valueOf(matcher.group(1));
+              }
+
+              pattern = java.util.regex.Pattern.compile(colPattern);
+              matcher = pattern.matcher(dataStr);
+              if (matcher.find()) {
+                col = Integer.valueOf(matcher.group(1));
+              }
+            } catch (Exception e) {
+              logger.warn("Failed to parse select_piece JSON: {}", e.getMessage());
+            }
+          }
+        }
+
         if (row == null || col == null) {
           logger.warn("Invalid select_piece data from user {} in room {}: row={}, col={}",
               userInfo.userId, userInfo.roomId, row, col);
@@ -386,10 +439,8 @@ public class RoomSocketServer implements InitializingBean {
         logger.error("Error handling select_piece: {}", e.getMessage(), e);
         client.sendEvent("error", "选择棋子时发生错误");
       }
-    });
-
-    // 移动棋子事件
-    socketIOServer.addEventListener("move_piece", Map.class, (client, data, ackSender) -> {
+    }); // 移动棋子事件
+    socketIOServer.addEventListener("move_piece", Object.class, (client, data, ackSender) -> {
       try {
         UserInfo userInfo = clientUsers.get(client.getSessionId().toString());
         if (userInfo == null) {
@@ -398,10 +449,31 @@ public class RoomSocketServer implements InitializingBean {
           return;
         }
 
-        @SuppressWarnings("unchecked")
-        Map<String, Integer> from = (Map<String, Integer>) data.get("from");
-        @SuppressWarnings("unchecked")
-        Map<String, Integer> to = (Map<String, Integer>) data.get("to");
+        Map<String, Object> from = null;
+        Map<String, Object> to = null;
+
+        // 处理不同格式的数据
+        if (data instanceof Map) {
+          @SuppressWarnings("unchecked")
+          Map<String, Object> map = (Map<String, Object>) data;
+          from = (Map<String, Object>) map.get("from");
+          to = (Map<String, Object>) map.get("to");
+        } else if (data instanceof String) {
+          String dataStr = (String) data;
+          if (dataStr.trim().startsWith("{") && dataStr.trim().endsWith("}")) {
+            try {
+              // 简单的JSON解析移动数据
+              // 这是一个复杂的嵌套JSON，建议前端直接发送Map格式
+              logger.warn("Received JSON string format for move_piece, please use Map format from frontend");
+              client.sendEvent("move_failed", "请使用正确的数据格式");
+              return;
+            } catch (Exception e) {
+              logger.warn("Failed to parse move_piece JSON: {}", e.getMessage());
+              client.sendEvent("move_failed", "JSON解析失败");
+              return;
+            }
+          }
+        }
 
         if (from == null || to == null ||
             from.get("row") == null || from.get("col") == null ||
@@ -411,8 +483,8 @@ public class RoomSocketServer implements InitializingBean {
           return;
         }
 
-        Position fromPos = new Position(from.get("row"), from.get("col"));
-        Position toPos = new Position(to.get("row"), to.get("col"));
+        Position fromPos = new Position((Integer) from.get("row"), (Integer) from.get("col"));
+        Position toPos = new Position((Integer) to.get("row"), (Integer) to.get("col"));
 
         boolean success = gameManager.playerMove(userInfo.roomId, userInfo.userId, fromPos, toPos);
 
@@ -428,15 +500,16 @@ public class RoomSocketServer implements InitializingBean {
               "to", Map.of("row", toPos.getRow(), "col", toPos.getCol())));
 
           // 发送更新的游戏状态
-          sendGameState(userInfo.roomId);
-
-          // 检查游戏是否结束
+          sendGameState(userInfo.roomId); // 检查游戏是否结束
           ChessGameState gameState = gameManager.getGameState(userInfo.roomId);
           if (gameState != null && gameState.getStatus() != GameStatus.PLAYING) {
             logger.info("Game ended in room {} with status {}", userInfo.roomId, gameState.getStatus());
             broadcastToRoom(userInfo.roomId, "game_ended", Map.of(
                 "status", gameState.getStatus().toString(),
                 "message", gameState.getGameStatusSummary()));
+
+            // 游戏结束后，延迟10秒后通知用户退出并删除房间
+            handleGameEnded(userInfo.roomId);
           }
         } else {
           logger.debug("Player {} failed to move piece from ({}, {}) to ({}, {}) in room {}",
@@ -468,6 +541,9 @@ public class RoomSocketServer implements InitializingBean {
               "userName", userInfo.userName));
 
           sendGameState(userInfo.roomId);
+
+          // 投降后游戏结束，通知用户退出并删除房间
+          handleGameEnded(userInfo.roomId);
         } else {
           logger.warn("Player {} failed to surrender in room {}", userInfo.userId, userInfo.roomId);
           client.sendEvent("surrender_failed", "投降失败");
@@ -542,16 +618,19 @@ public class RoomSocketServer implements InitializingBean {
                 roomClients.remove(userInfo.roomId);
                 logger.info("Room {} now empty, removing from active rooms", userInfo.roomId);
               }
-            }
-
-            // 只有已认证的用户才需要离开游戏房间
+            } // 只有已认证的用户才需要离开游戏房间
             if (userInfo.isAuthenticated) {
               gameManager.leaveRoom(userInfo.roomId, userInfo.userId);
 
-              // 广播玩家离开
+              // 广播玩家离开事件
               broadcastToRoom(userInfo.roomId, "player_left", Map.of(
                   "userId", userInfo.userId,
-                  "userName", userInfo.userName));
+                  "userName", userInfo.userName,
+                  "message", userInfo.userName + " 离开了房间"));
+
+              // 发送更新的游戏状态和房间状态给剩余玩家
+              sendGameState(userInfo.roomId);
+              sendRoomStatus(userInfo.roomId);
             }
           } else {
             logger.debug("Unknown client {} disconnected", clientId);
@@ -574,6 +653,25 @@ public class RoomSocketServer implements InitializingBean {
       for (SocketIOClient client : clients.values()) {
         client.sendEvent(event, data);
       }
+      logger.debug("Broadcasted event '{}' to {} clients in room {}", event, clients.size(), roomId);
+    }
+  }
+
+  /**
+   * 向房间内除了指定客户端外的所有客户端广播消息
+   */
+  private void broadcastToRoomExcept(String roomId, String excludeClientId, String event, Object data) {
+    Map<String, SocketIOClient> clients = roomClients.get(roomId);
+    if (clients != null) {
+      int broadcastCount = 0;
+      for (Map.Entry<String, SocketIOClient> entry : clients.entrySet()) {
+        if (!entry.getKey().equals(excludeClientId)) {
+          entry.getValue().sendEvent(event, data);
+          broadcastCount++;
+        }
+      }
+      logger.debug("Broadcasted event '{}' to {} clients in room {} (excluded {})",
+          event, broadcastCount, roomId, excludeClientId);
     }
   }
 
@@ -727,5 +825,74 @@ public class RoomSocketServer implements InitializingBean {
 
     boardData.put("pieces", boardArray);
     return boardData;
+  }
+
+  /**
+   * 处理游戏结束后的清理工作
+   */
+  private void handleGameEnded(String roomId) {
+    // 创建定时任务，延迟10秒后通知用户退出并删除房间
+    java.util.concurrent.ScheduledExecutorService scheduler = java.util.concurrent.Executors
+        .newSingleThreadScheduledExecutor();
+
+    scheduler.schedule(() -> {
+      try {
+        logger.info("Handling game ended for room {}", roomId);
+        // 通知房间内所有用户游戏结束，需要退出
+        broadcastToRoom(roomId, "room_closing", Map.of(
+            "message", "游戏已结束，房间将在30秒后关闭",
+            "countdown", 30));
+
+        // 再延迟30秒后强制断开连接并删除房间
+        scheduler.schedule(() -> {
+          try {
+            logger.info("Force closing room {}", roomId);
+
+            // 通知所有用户房间关闭
+            broadcastToRoom(roomId, "room_closed", Map.of(
+                "message", "房间已关闭"));
+
+            // 断开房间内所有客户端连接
+            Map<String, SocketIOClient> clients = roomClients.get(roomId);
+            if (clients != null) {
+              for (SocketIOClient client : clients.values()) {
+                try {
+                  client.sendEvent("forced_disconnect", "房间已关闭，连接即将断开");
+                  // 短暂延迟后断开连接，确保消息能发送
+                  java.util.concurrent.Executors.newSingleThreadScheduledExecutor()
+                      .schedule(() -> client.disconnect(), 2, java.util.concurrent.TimeUnit.SECONDS);
+                } catch (Exception e) {
+                  logger.error("Error disconnecting client: {}", e.getMessage());
+                }
+              }
+            }
+
+            // 清理客户端信息
+            if (clients != null) {
+              for (String clientId : clients.keySet()) {
+                clientUsers.remove(clientId);
+                authenticatedClients.remove(clientId);
+              }
+            }
+
+            // 清理房间信息
+            roomClients.remove(roomId);
+
+            // 从游戏管理器中删除房间
+            gameManager.removeRoom(roomId);
+
+            logger.info("Room {} has been completely cleaned up", roomId);
+
+          } catch (Exception e) {
+            logger.error("Error during room cleanup for {}: {}", roomId, e.getMessage(), e);
+          } finally {
+            scheduler.shutdown();
+          }
+        }, 30, java.util.concurrent.TimeUnit.SECONDS);
+
+      } catch (Exception e) {
+        logger.error("Error handling game ended for room {}: {}", roomId, e.getMessage(), e);
+      }
+    }, 10, java.util.concurrent.TimeUnit.SECONDS);
   }
 }

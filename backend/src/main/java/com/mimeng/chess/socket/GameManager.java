@@ -106,9 +106,7 @@ public class GameManager {
     if (room == null) {
       logger.error("Failed to get or create game room {}", roomId);
       return false;
-    }
-
-    // 检查用户是否有权限加入该房间
+    } // 检查用户是否有权限加入该房间
     boolean canJoin = false;
     if (room.getPlayer1Id() != null && room.getPlayer1Id().equals(userId)) {
       canJoin = true;
@@ -116,6 +114,25 @@ public class GameManager {
     } else if (room.getPlayer2Id() != null && room.getPlayer2Id().equals(userId)) {
       canJoin = true;
       logger.info("User {} is player2 of room {}", userId, roomId);
+    } else if (room.getPlayer2Id() == null) {
+      // 如果player2为null，允许新玩家加入作为player2
+      canJoin = true;
+      logger.info("User {} joining as player2 in room {} (player2 slot is empty)", userId, roomId);
+
+      // 更新数据库中的player2Id
+      try {
+        Room dbRoom = roomService.getById(roomId);
+        if (dbRoom != null) {
+          dbRoom.setPlayer2Id(userId);
+          roomService.updateById(dbRoom);
+          // 同时更新内存中的房间信息
+          room.setPlayer2Id(userId);
+          logger.info("Updated player2Id to {} for room {} in database and memory", userId, roomId);
+        }
+      } catch (Exception e) {
+        logger.error("Failed to update player2Id for room {}: {}", roomId, e.getMessage(), e);
+        return false;
+      }
     } else {
       logger.warn("User {} is not authorized to join room {} (player1: {}, player2: {})",
           userId, roomId, room.getPlayer1Id(), room.getPlayer2Id());
@@ -420,18 +437,63 @@ public class GameManager {
    * 投降
    */
   public boolean surrender(String roomId, Long userId) {
+    logger.info("Surrender request - roomId: {}, userId: {}", roomId, userId);
+
     ChessRoom room = activeRooms.get(roomId);
-    if (room == null || room.getGameState() == null) {
+    if (room == null) {
+      logger.warn("Surrender failed - room not found: {}", roomId);
+      return false;
+    }
+
+    if (room.getGameState() == null) {
+      logger.warn("Surrender failed - game state is null for room: {}", roomId);
       return false;
     }
 
     ChessGameState gameState = room.getGameState();
-    if (gameState.isPlayerTurn(userId)) {
-      gameState.surrender();
-      return true;
+    logger.info("Game status: {}", gameState.getStatus());
+
+    // 检查游戏是否正在进行
+    if (gameState.getStatus() != GameStatus.PLAYING) {
+      logger.warn("Surrender failed - game is not playing. Status: {}", gameState.getStatus());
+      return false;
     }
 
-    return false;
+    // 检查玩家是否在游戏中（红方或黑方）
+    boolean isValidPlayer = false;
+    if (gameState.getRedPlayer() != null) {
+      logger.info("Red player: userId={}, name={}",
+          gameState.getRedPlayer().getUserId(), gameState.getRedPlayer().getName());
+      if (gameState.getRedPlayer().getUserId() != null &&
+          gameState.getRedPlayer().getUserId().equals(userId)) {
+        isValidPlayer = true;
+        logger.info("User {} is red player", userId);
+      }
+    } else {
+      logger.info("Red player is null");
+    }
+
+    if (gameState.getBlackPlayer() != null) {
+      logger.info("Black player: userId={}, name={}",
+          gameState.getBlackPlayer().getUserId(), gameState.getBlackPlayer().getName());
+      if (gameState.getBlackPlayer().getUserId() != null &&
+          gameState.getBlackPlayer().getUserId().equals(userId)) {
+        isValidPlayer = true;
+        logger.info("User {} is black player", userId);
+      }
+    } else {
+      logger.info("Black player is null");
+    }
+
+    if (isValidPlayer) {
+      logger.info("User {} is valid player, executing surrender", userId);
+      gameState.surrender();
+      logger.info("Surrender executed successfully. New status: {}", gameState.getStatus());
+      return true;
+    } else {
+      logger.warn("Surrender failed - user {} is not a valid player in room {}", userId, roomId);
+      return false;
+    }
   }
 
   /**

@@ -86,6 +86,14 @@ public class ChessRoom extends Room {
       }
       updateLastActivity();
       return true;
+    } else if (getPlayer1Id().equals(userId)) {
+      // 玩家1已存在，但可能游戏状态中的红方玩家没有设置，需要重新设置
+      if (gameState != null && gameState.getRedPlayer() == null) {
+        Player redPlayer = new Player(userId, playerName, playerType, PlayerColor.RED);
+        gameState.setRedPlayer(redPlayer);
+        updateLastActivity();
+      }
+      return true;
     } else if (getPlayer2Id() == null && !getPlayer1Id().equals(userId)) {
       setPlayer2Id(userId);
       if (gameState != null) {
@@ -93,6 +101,14 @@ public class ChessRoom extends Room {
         gameState.setBlackPlayer(blackPlayer);
       }
       updateLastActivity();
+      return true;
+    } else if (getPlayer2Id() != null && getPlayer2Id().equals(userId)) {
+      // 玩家2已存在，但可能游戏状态中的黑方玩家没有设置，需要重新设置
+      if (gameState != null && gameState.getBlackPlayer() == null) {
+        Player blackPlayer = new Player(userId, playerName, playerType, PlayerColor.BLACK);
+        gameState.setBlackPlayer(blackPlayer);
+        updateLastActivity();
+      }
       return true;
     }
     return false;
@@ -218,6 +234,12 @@ public class ChessRoom extends Room {
         break;
       case DRAW:
         draws++;
+        break;
+      case PLAYING:
+      case WAITING:
+      case PAUSED:
+      case ABANDONED:
+        // 这些状态不需要更新统计
         break;
     }
   }

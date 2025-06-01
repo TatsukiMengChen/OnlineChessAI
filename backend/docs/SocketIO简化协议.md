@@ -26,6 +26,25 @@ ws://localhost:8080?id=房间ID
 - 成功：`auth_success` - "鉴权成功"
 - 失败：`auth_fail` - "token 无效"
 
+**认证成功后的广播：**
+
+```json
+{
+  "event": "player_joined",
+  "data": {
+    "userId": 123,
+    "userName": "User123",
+    "message": "User123 加入了房间"
+  }
+}
+```
+
+**注意：** 认证成功后，服务器会自动：
+
+1. 向其他玩家广播新玩家加入信息
+2. 发送当前游戏状态给新玩家
+3. 发送房间状态给所有玩家
+
 ## 核心游戏事件
 
 ### 1. 玩家准备
@@ -44,9 +63,20 @@ ws://localhost:8080?id=房间ID
 ```json
 {
   "event": "player_ready_changed",
-  "data": { "userId": 123, "ready": true }
+  "data": {
+    "userId": 123,
+    "userName": "User123",
+    "ready": true,
+    "message": "User123 已准备"
+  }
 }
 ```
+
+**注意：** 玩家准备状态变更后，服务器会自动：
+
+1. 广播准备状态变更给所有玩家
+2. 更新游戏状态和房间状态
+3. 检查是否可以开始游戏（双方都准备好时自动开始）
 
 **游戏开始：**
 
@@ -157,6 +187,19 @@ ws://localhost:8080?id=房间ID
 
 ## 状态同步
 
+### 主动获取房间状态
+
+**客户端 → 服务器：**
+
+```json
+{
+  "event": "get_room_state",
+  "data": {}
+}
+```
+
+**说明：** 客户端可以主动请求获取当前房间状态，服务器会立即返回最新的游戏状态和房间状态。
+
 ### 游戏状态更新
 
 ```json
@@ -194,17 +237,68 @@ ws://localhost:8080?id=房间ID
 
 ### 玩家进出
 
+#### 玩家加入房间
+
+**触发时机：** 玩家认证成功后自动广播
+
 ```json
-// 玩家加入
 {
   "event": "player_joined",
-  "data": {"userId": 123, "userName": "新玩家"}
+  "data": {
+    "userId": 123,
+    "userName": "User123",
+    "message": "User123 加入了房间"
+  }
 }
+```
 
-// 玩家离开
+#### 玩家离开房间
+
+**触发时机：** 玩家断开连接时自动广播
+
+```json
 {
   "event": "player_left",
-  "data": {"userId": 123, "userName": "离开的玩家"}
+  "data": {
+    "userId": 123,
+    "userName": "User123",
+    "message": "User123 离开了房间"
+  }
+}
+```
+
+### 房间状态更新
+
+**自动发送时机：**
+
+- 玩家加入/离开房间时
+- 玩家准备状态变更时
+- 游戏开始/结束时
+
+```json
+{
+  "event": "room_status",
+  "data": {
+    "status": "WAITING",
+    "message": "等待玩家准备",
+    "players": {
+      "red": {
+        "userId": 123,
+        "name": "User123",
+        "ready": true,
+        "online": true,
+        "color": "RED"
+      },
+      "black": {
+        "userId": 456,
+        "name": "User456",
+        "ready": false,
+        "online": true,
+        "color": "BLACK"
+      }
+    },
+    "waitingForPlayers": false
+  }
 }
 ```
 
@@ -276,3 +370,66 @@ socket.on("game_ended", (data) => {
 6. **简单的游戏结束检测** ✅
 
 这套协议提供了最基本但完整的象棋游戏体验。
+
+## 广播机制详解
+
+### 自动广播事件
+
+服务器会在以下情况自动向房间内所有客户端广播消息：
+
+#### 1. 玩家生命周期事件
+
+- **玩家加入房间**：认证成功后广播 `player_joined`
+- **玩家离开房间**：断开连接时广播 `player_left`
+- **玩家准备状态变更**：准备/取消准备时广播 `player_ready_changed`
+
+#### 2. 游戏进程事件
+
+- **游戏开始**：双方都准备好时广播 `game_started`
+- **棋子选择**：选择棋子时广播 `piece_selected`
+- **棋子移动**：移动棋子时广播 `piece_moved`
+- **游戏结束**：将军、投降、超时时广播 `game_ended`
+
+#### 3. 状态同步事件
+
+- **游戏状态更新**：每次游戏状态变更后发送 `game_state`
+- **房间状态更新**：玩家进出、准备状态变更后发送 `room_status`
+
+### 广播范围
+
+- **房间内广播**：消息发送给房间内所有在线玩家
+- **排除发送者**：某些事件（如玩家加入）不会发送给触发事件的玩家本人
+- **单独发送**：可移动位置等信息只发送给相关玩家
+
+### 客户端处理建议
+
+```javascript
+// 监听所有广播事件
+socket.on("player_joined", (data) => {
+  console.log(`${data.userName} 加入了房间`);
+  updatePlayerList();
+});
+
+socket.on("player_left", (data) => {
+  console.log(`${data.userName} 离开了房间`);
+  updatePlayerList();
+});
+
+socket.on("player_ready_changed", (data) => {
+  console.log(`${data.userName} ${data.ready ? "已准备" : "取消准备"}`);
+  updateReadyStatus(data.userId, data.ready);
+});
+
+socket.on("game_started", (data) => {
+  console.log("游戏开始！");
+  showGameBoard();
+});
+
+socket.on("room_status", (data) => {
+  updateRoomStatus(data);
+});
+
+socket.on("game_state", (data) => {
+  updateGameState(data);
+});
+```
