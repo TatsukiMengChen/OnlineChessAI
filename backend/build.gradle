@@ -34,7 +34,7 @@ dependencies {
     runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.11.5'
     implementation 'com.baomidou:mybatis-plus-generator:3.5.5'
     implementation 'org.apache.velocity:velocity-engine-core:2.3'
-    implementation 'com.corundumstudio.socketio:netty-socketio:1.7.19'
+    implementation 'com.corundumstudio.socketio:netty-socketio:2.0.11'
     annotationProcessor 'org.projectlombok:lombok:1.18.32'
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'

@@ -25,6 +25,9 @@ public class RoomSocketServer implements InitializingBean {
   @Autowired
   private GameManager gameManager;
 
+  @Autowired
+  private com.mimeng.chess.service.UserService userService;
+
   // 存储客户端信息 clientId -> userInfo
   private final Map<String, UserInfo> clientUsers = new ConcurrentHashMap<>();
   // 存储房间中的客户端 roomId -> Set<clientId>
@@ -50,33 +53,93 @@ public class RoomSocketServer implements InitializingBean {
       @Override
       public void onConnect(SocketIOClient client) {
         String roomId = client.getHandshakeData().getSingleUrlParam("id");
+        logger.info("Client {} connected to room {}", client.getSessionId(), roomId);
+
         if (roomId == null) {
           client.disconnect();
           return;
         }
+        logger.info("Client {} is trying to authenticate in room {}", client.getSessionId(), roomId);
         client.sendEvent("need_auth", "请发送token进行鉴权");
       }
-    }); // 鉴权事件
+    });
+
+    // 鉴权事件 - 修复的核心部分
     socketIOServer.addEventListener("auth", Object.class, (client, data, ackSender) -> {
       try {
         String token = null;
+
+        // 调试日志：打印接收到的数据类型和内容
+        logger.debug("Auth data received - Type: {}, Content: {}",
+            data != null ? data.getClass().getSimpleName() : "null", data);
+
+        // 处理不同格式的token数据
         if (data instanceof String) {
-          token = (String) data;
-        } else if (data instanceof java.util.Map map && map.get("token") instanceof String) {
-          token = (String) map.get("token");
+          String dataStr = (String) data;
+          // 检查是否是JSON格式的字符串
+          if (dataStr.trim().startsWith("{") && dataStr.trim().endsWith("}")) {
+            // 尝试手动解析JSON字符串
+            try {
+              // 简单的JSON解析，查找token字段
+              String tokenPattern = "\"token\"\\s*:\\s*\"([^\"]+)\"";
+              java.util.regex.Pattern pattern = java.util.regex.Pattern.compile(tokenPattern);
+              java.util.regex.Matcher matcher = pattern.matcher(dataStr);
+              if (matcher.find()) {
+                token = matcher.group(1);
+                logger.debug("Extracted token from JSON string: {}",
+                    token.substring(0, Math.min(20, token.length())) + "...");
+              }
+            } catch (Exception jsonEx) {
+              logger.warn("Failed to parse JSON string: {}", jsonEx.getMessage());
+            }
+          } else {
+            // 直接作为token使用
+            token = dataStr;
+          }
+        } else if (data instanceof Map) {
+          @SuppressWarnings("unchecked")
+          Map<String, Object> map = (Map<String, Object>) data;
+          Object tokenObj = map.get("token");
+          if (tokenObj instanceof String) {
+            token = (String) tokenObj;
+            logger.debug("Extracted token from Map: {}", token.substring(0, Math.min(20, token.length())) + "...");
+          }
         }
 
-        if (token == null) {
-          logger.warn("Client {} attempted auth without token", client.getSessionId());
-          client.sendEvent("auth_fail", "token缺失");
+        if (token == null || token.trim().isEmpty()) {
+          logger.warn("Client {} attempted auth without valid token", client.getSessionId());
+          client.sendEvent("auth_fail", "token缺失或无效");
+          client.disconnect();
+          return;
+        } // 解析JWT token
+        Claims claims;
+        try {
+          logger.debug("Attempting to parse JWT token: {}", token.substring(0, Math.min(20, token.length())) + "...");
+          claims = JwtUtil.parseToken(token);
+          logger.debug("JWT token parsed successfully");
+        } catch (Exception e) {
+          logger.error("Failed to parse JWT token: {}", e.getMessage(), e);
+          client.sendEvent("auth_fail", "token解析失败: " + e.getMessage());
           client.disconnect();
           return;
         }
 
-        Claims claims = JwtUtil.parseToken(token);
-        Long userId = Long.valueOf(claims.getSubject());
-        String userName = claims.get("username", String.class);
+        String userIdStr = claims.get("userId", String.class);
+        String email = claims.get("email", String.class);
         String roomId = client.getHandshakeData().getSingleUrlParam("id");
+
+        logger.debug("Extracted from token - userId: {}, email: {}, roomId: {}", userIdStr, email, roomId);
+
+        if (userIdStr == null || email == null) {
+          logger.warn("Client {} auth with missing userId or email in token", client.getSessionId());
+          client.sendEvent("auth_fail", "token中缺少必要信息");
+          client.disconnect();
+          return;
+        }
+
+        Long userId = Long.valueOf(userIdStr);
+        // 从email中提取用户名作为显示名称
+        String userName = email.split("@")[0];
 
         if (userId == null || userName == null || roomId == null) {
           logger.warn("Client {} auth with incomplete data: userId={}, userName={}, roomId={}",
@@ -118,7 +181,9 @@ public class RoomSocketServer implements InitializingBean {
         client.sendEvent("auth_fail", "token无效");
         client.disconnect();
       }
-    }); // 玩家准备事件
+    });
+
+    // 玩家准备事件
     socketIOServer.addEventListener("player_ready", Map.class, (client, data, ackSender) -> {
       try {
         UserInfo userInfo = clientUsers.get(client.getSessionId().toString());
@@ -160,7 +225,9 @@ public class RoomSocketServer implements InitializingBean {
         logger.error("Error handling player_ready: {}", e.getMessage(), e);
         client.sendEvent("error", "处理准备状态时发生错误");
       }
-    }); // 选择棋子事件
+    });
+
+    // 选择棋子事件
     socketIOServer.addEventListener("select_piece", Map.class, (client, data, ackSender) -> {
       try {
         UserInfo userInfo = clientUsers.get(client.getSessionId().toString());
@@ -208,7 +275,9 @@ public class RoomSocketServer implements InitializingBean {
         logger.error("Error handling select_piece: {}", e.getMessage(), e);
         client.sendEvent("error", "选择棋子时发生错误");
       }
-    }); // 移动棋子事件
+    });
+
+    // 移动棋子事件
     socketIOServer.addEventListener("move_piece", Map.class, (client, data, ackSender) -> {
       try {
         UserInfo userInfo = clientUsers.get(client.getSessionId().toString());
@@ -268,7 +337,9 @@ public class RoomSocketServer implements InitializingBean {
         logger.error("Error handling move_piece: {}", e.getMessage(), e);
         client.sendEvent("error", "移动棋子时发生错误");
       }
-    }); // 投降事件
+    });
+
+    // 投降事件
     socketIOServer.addEventListener("surrender", Object.class, (client, data, ackSender) -> {
       try {
         UserInfo userInfo = clientUsers.get(client.getSessionId().toString());
@@ -294,7 +365,9 @@ public class RoomSocketServer implements InitializingBean {
         logger.error("Error handling surrender: {}", e.getMessage(), e);
         client.sendEvent("error", "投降时发生错误");
       }
-    }); // 悔棋事件
+    });
+
+    // 悔棋事件
     socketIOServer.addEventListener("undo_move", Object.class, (client, data, ackSender) -> {
       try {
         UserInfo userInfo = clientUsers.get(client.getSessionId().toString());
@@ -319,7 +392,23 @@ public class RoomSocketServer implements InitializingBean {
         logger.error("Error handling undo_move: {}", e.getMessage(), e);
         client.sendEvent("error", "悔棋时发生错误");
       }
-    }); // 断开连接监听器
+    });
+
+    // 离开房间事件
+    socketIOServer.addEventListener("leave_room", Object.class, (client, data, ackSender) -> {
+      try {
+        UserInfo userInfo = clientUsers.get(client.getSessionId().toString());
+        if (userInfo != null) {
+          logger.info("Player {} requested to leave room {}", userInfo.userId, userInfo.roomId);
+          // 断开连接会自动触发离开房间的逻辑
+          client.disconnect();
+        }
+      } catch (Exception e) {
+        logger.error("Error handling leave_room: {}", e.getMessage(), e);
+      }
+    });
+
+    // 断开连接监听器
     socketIOServer.addDisconnectListener(new DisconnectListener() {
       @Override
       public void onDisconnect(SocketIOClient client) {
