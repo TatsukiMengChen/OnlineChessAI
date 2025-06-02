@@ -110,45 +110,65 @@
         android:paddingBottom="12dp"
         app:layout_constraintTop_toBottomOf="@id/tv_game_features"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent" />
-
-    <!-- 底部按钮组 -->
+        app:layout_constraintEnd_toEndOf="parent" />    <!-- 底部按钮组 -->
     <LinearLayout
         android:id="@+id/layout_bottom_buttons"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:orientation="horizontal" android:layout_marginStart="8dp"
+        android:orientation="vertical"
+        android:layout_marginStart="8dp"
         android:layout_marginEnd="8dp"
         android:layout_marginBottom="16dp"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent">
 
-        <!-- 修改密码按钮 -->
-        <Button
-            android:id="@+id/btn_change_password"
-            style="@style/Widget.Chess.Button.Secondary"
-            android:layout_width="0dp"
-            android:layout_height="56dp"
-            android:layout_weight="1"
-            android:layout_marginEnd="8dp"
-            android:text="修改密码"
-            android:textSize="16sp"
-            android:drawableStart="@drawable/ic_lock_24"
-            android:drawablePadding="8dp"
-            android:drawableTint="@color/chess_brown_medium" />
+        <!-- 第一行按钮：修改密码和退出登录 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="12dp">
 
-        <!-- 退出登录按钮 -->
+            <!-- 修改密码按钮 -->
+            <Button
+                android:id="@+id/btn_change_password"
+                style="@style/Widget.Chess.Button.Secondary"
+                android:layout_width="0dp"
+                android:layout_height="56dp"
+                android:layout_weight="1"
+                android:layout_marginEnd="8dp"
+                android:text="修改密码"
+                android:textSize="16sp"
+                android:drawableStart="@drawable/ic_lock_24"
+                android:drawablePadding="8dp"
+                android:drawableTint="@color/chess_brown_medium" />
+
+            <!-- 退出登录按钮 -->
+            <Button
+                android:id="@+id/btn_logout"
+                style="@style/Widget.Chess.Button.Outline"
+                android:layout_width="0dp"
+                android:layout_height="56dp"
+                android:layout_weight="1"
+                android:layout_marginStart="8dp"
+                android:text="退出登录"
+                android:textSize="16sp"
+                android:drawableStart="@drawable/ic_logout_24"
+                android:drawablePadding="8dp"
+                android:drawableTint="@color/chess_brown_medium" />
+
+        </LinearLayout>
+
+        <!-- 第二行按钮：关于 -->
         <Button
-            android:id="@+id/btn_logout"
+            android:id="@+id/btn_about"
             style="@style/Widget.Chess.Button.Outline"
-            android:layout_width="0dp"
+            android:layout_width="match_parent"
             android:layout_height="56dp"
-            android:layout_weight="1"
-            android:layout_marginStart="8dp"
-            android:text="退出登录"
+            android:text="关于"
             android:textSize="16sp"
-            android:drawableStart="@drawable/ic_logout_24"
+            android:drawableStart="@drawable/ic_info_24"
             android:drawablePadding="8dp"
             android:drawableTint="@color/chess_brown_medium" />
 
